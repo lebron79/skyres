@@ -1,0 +1,35 @@
+# ── Frontend ──────────────────────────────────────────
+front/node_modules/
+front/dist/
+front/dist-ssr/
+*.local
+
+# ── Backend ───────────────────────────────────────────
+back/target/
+back/.mvn/wrapper/maven-wrapper.jar
+
+# ── Secrets (never commit these) ──────────────────────
+.env
+.env.local
+application-local.properties
+application-secret.properties
+
+# ── Logs ─────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+
+# ── IDE ───────────────────────────────────────────────
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ── OS ────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

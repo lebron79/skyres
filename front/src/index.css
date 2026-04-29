@@ -1,0 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #F9F8F5;
+  --bg-alt:    #F2F0EC;
+  --surface:   #FFFFFF;
+  --border:    #E8E4DC;
+
+  --text:      #1A1714;
+  --text-2:    #6B6560;
+  --text-3:    #A8A49E;
+
+  --teal:      #0C7A6E;
+  --teal-mid:  #0E9485;
+  --teal-soft: #EDF7F6;
+  --teal-glow: rgba(12,122,110,0.1);
+
+  --coral:     #E8601A;
+  --coral-soft:#FFF3ED;
+
+  --shadow-xs: 0 1px 2px rgba(26,23,20,0.05);
+  --shadow-sm: 0 2px 8px rgba(26,23,20,0.07), 0 1px 2px rgba(26,23,20,0.04);
+  --shadow-md: 0 8px 24px rgba(26,23,20,0.09), 0 2px 6px rgba(26,23,20,0.05);
+  --shadow-lg: 0 24px 56px rgba(26,23,20,0.12), 0 8px 16px rgba(26,23,20,0.06);
+
+  --r-sm: 10px;
+  --r:    16px;
+  --r-lg: 24px;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+a      { color: inherit; text-decoration: none; }
+img    { display: block; max-width: 100%; }
+button { cursor: pointer; font-family: inherit; border: none; }
