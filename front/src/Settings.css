@@ -1,0 +1,340 @@
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 23, 20, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  backdrop-filter: blur(4px);
+}
+
+.settings-modal {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 32px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+
+.settings-header h1 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text);
+  margin: 0;
+}
+
+.settings-close {
+  background: none;
+  border: none;
+  color: var(--text-2);
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-sm);
+  transition: background 0.2s, color 0.2s;
+}
+
+.settings-close:hover {
+  background: var(--bg-alt);
+  color: var(--text);
+}
+
+.settings-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  padding: 0 32px;
+}
+
+.settings-tab {
+  padding: 16px 20px;
+  border: none;
+  background: none;
+  color: var(--text-2);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom: 3px solid transparent;
+  position: relative;
+  bottom: -1px;
+}
+
+.settings-tab.active {
+  color: var(--teal);
+  border-bottom-color: var(--teal);
+}
+
+.settings-tab:hover:not(.active) {
+  color: var(--text);
+}
+
+.settings-message {
+  padding: 12px 32px;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.settings-message.success {
+  background: rgba(12, 122, 110, 0.08);
+  color: var(--teal);
+  border-bottom: 1px solid rgba(12, 122, 110, 0.2);
+}
+
+.settings-message.error {
+  background: rgba(220, 38, 38, 0.08);
+  color: #991b1b;
+  border-bottom: 1px solid rgba(220, 38, 38, 0.2);
+}
+
+.settings-content {
+  padding: 32px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings-form h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.form-group input,
+.form-group textarea {
+  padding: 11px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+  color: var(--text-3);
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(12, 122, 110, 0.1);
+}
+
+.form-group input:disabled,
+.form-group textarea:disabled {
+  background-color: var(--bg-alt);
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.photo-upload-container {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border: 2px dashed var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-alt);
+  position: relative;
+}
+
+.photo-preview {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+}
+
+.photo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+}
+
+.photo-remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #991b1b;
+  color: white;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.photo-remove:hover {
+  background: #7f1d1d;
+}
+
+.photo-upload-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  flex: 1;
+  color: var(--teal);
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: color 0.2s;
+}
+
+.photo-upload-label:hover {
+  color: var(--teal-mid);
+}
+
+.photo-upload-label svg {
+  color: var(--teal);
+}
+
+.upload-spinner {
+  padding: 8px 12px;
+  background: var(--teal);
+  color: white;
+  border-radius: var(--r-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+
+.form-info {
+  background: var(--bg-alt);
+  padding: 16px;
+  border-radius: var(--r-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form-info div {
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.form-info strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.role-badge {
+  display: inline-block;
+  background: var(--teal);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.btn-submit {
+  background: var(--teal);
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: var(--r-sm);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+  margin-top: 8px;
+}
+
+.btn-submit:hover:not(:disabled) {
+  background: var(--teal-mid);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(12, 122, 110, 0.25);
+}
+
+.btn-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .settings-modal {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .settings-header {
+    padding: 20px;
+  }
+
+  .settings-content {
+    padding: 24px 20px;
+  }
+
+  .settings-tabs {
+    padding: 0 20px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}

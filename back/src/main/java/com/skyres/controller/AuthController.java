@@ -43,6 +43,7 @@ public class AuthController {
                 .lastName(request.getLastName())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
+                .phone(request.getPhone())
                 .role(Role.TOURIST)
                 .build();
 
@@ -51,7 +52,18 @@ public class AuthController {
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
         String token = jwtUtil.generateToken(userDetails);
 
-        return ResponseEntity.ok(new AuthResponse(token, user.getEmail(), user.getRole().name()));
+        return ResponseEntity.ok(AuthResponse.builder()
+                .token(token)
+                .id(user.getId())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .photoUrl(user.getPhotoUrl())
+                .bio(user.getBio())
+                .role(user.getRole().name())
+                .createdAt(user.getCreatedAt())
+                .build());
     }
 
     @PostMapping("/login")
@@ -64,6 +76,17 @@ public class AuthController {
         String token = jwtUtil.generateToken(userDetails);
 
         User user = userRepository.findByEmail(request.getEmail()).orElseThrow();
-        return ResponseEntity.ok(new AuthResponse(token, user.getEmail(), user.getRole().name()));
+        return ResponseEntity.ok(AuthResponse.builder()
+                .token(token)
+                .id(user.getId())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .photoUrl(user.getPhotoUrl())
+                .bio(user.getBio())
+                .role(user.getRole().name())
+                .createdAt(user.getCreatedAt())
+                .build());
     }
 }

@@ -1,4 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useAuth } from './AuthContext'
+import Login from './Login'
+import UserMenu from './UserMenu'
+import Settings from './Settings'
 import './App.css'
 
 const UNS = 'https://images.unsplash.com'
@@ -143,6 +147,20 @@ const heroCards = [
 
 export default function App() {
   const [search, setSearch] = useState('')
+  const { isAuthenticated, loading } = useAuth()
+  const [showSettings, setShowSettings] = useState(false)
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg)' }}>
+        <p style={{ color: 'var(--text-2)' }}>Loading...</p>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return <Login />
+  }
 
   return (
     <div>
@@ -159,8 +177,8 @@ export default function App() {
           <li><a href="#team">Team</a></li>
         </ul>
         <div className="nav-right">
-          <button className="nav-signin">Sign in</button>
-          <a href="#team" className="nav-cta">Get started</a>
+          <UserMenu onSettingsClick={() => setShowSettings(true)} />
+          <a href="#team" className="nav-cta">Explore</a>
         </div>
       </nav>
 
@@ -514,6 +532,7 @@ export default function App() {
         </ul>
         <span className="footer-copy">Smart Tourism Platform — Spring Boot · React · MySQL</span>
       </footer>
+      {showSettings && <Settings onClose={() => setShowSettings(false)} />}
     </div>
   )
 }

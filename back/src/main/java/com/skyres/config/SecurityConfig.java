@@ -30,12 +30,15 @@ public class SecurityConfig {
     private final JwtFilter jwtFilter;
 
     private static final String[] PUBLIC_ROUTES = {
+        "/",
+        "/api/health",
         "/api/auth/**",
         "/api/guides/**",
         "/api/activities/**",
         "/api/intelligence/**",
         "/swagger-ui/**",
         "/api-docs/**",
+        "/v3/api-docs/**",
         "/swagger-ui.html"
     };
 
@@ -46,6 +49,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("GET", "/api/upload/profile-image/**").permitAll()
                         .requestMatchers(PUBLIC_ROUTES).permitAll()
                         .anyRequest().authenticated()
                 )
