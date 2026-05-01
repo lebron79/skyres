@@ -36,7 +36,8 @@ public class JwtFilter extends OncePerRequestFilter {
         String token = header.substring(7);
         String username = jwtUtil.extractUsername(token);
 
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+        // Always rebuild authentication from DB when JWT is valid (fresh roles after ADMIN promotion / logout elsewhere).
+        if (username != null) {
             UserDetails userDetails = userDetailsService.loadUserByUsername(username);
             if (jwtUtil.isValid(token, userDetails)) {
                 var auth = new UsernamePasswordAuthenticationToken(

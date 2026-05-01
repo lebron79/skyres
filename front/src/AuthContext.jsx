@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 
 const AuthContext = createContext();
 
@@ -10,18 +10,7 @@ export const AuthProvider = ({ children }) => {
 
   const API_BASE = 'http://localhost:8080';
 
-  // Load token from localStorage on mount
-  useEffect(() => {
-    const savedToken = localStorage.getItem('authToken');
-    if (savedToken) {
-      setToken(savedToken);
-      // Verify token is still valid by fetching user profile
-      fetchUserProfile(savedToken);
-    }
-    setLoading(false);
-  }, []);
-
-  const fetchUserProfile = async (authToken) => {
+  const fetchUserProfile = useCallback(async (authToken) => {
     try {
       const res = await fetch(`${API_BASE}/api/users/me`, {
         headers: { Authorization: `Bearer ${authToken}` },
@@ -32,11 +21,35 @@ export const AuthProvider = ({ children }) => {
       } else {
         localStorage.removeItem('authToken');
         setToken(null);
+        setUser(null);
       }
     } catch (err) {
       console.error('Error fetching profile:', err);
+      localStorage.removeItem('authToken');
+      setToken(null);
+      setUser(null);
     }
-  };
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    const t = token ?? localStorage.getItem('authToken');
+    if (!t) return
+    await fetchUserProfile(t)
+  }, [token, fetchUserProfile]);
+
+  // Wait for /api/users/me when restoring a session so role matches the server before rendering routes
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const savedToken = localStorage.getItem('authToken')
+      if (savedToken) {
+        setToken(savedToken)
+        await fetchUserProfile(savedToken)
+      }
+      if (!cancelled) setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [fetchUserProfile])
 
   const register = async (firstName, lastName, email, password, phone = '') => {
     setError(null);
@@ -172,6 +185,7 @@ export const AuthProvider = ({ children }) => {
         logout,
         updateProfile,
         changePassword,
+        refreshUser,
         isAuthenticated: !!token,
       }}
     >

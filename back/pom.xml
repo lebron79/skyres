@@ -113,6 +113,11 @@
       <artifactId>spring-security-test</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
 
   </dependencies>
 
@@ -130,8 +135,7 @@
           </excludes>
         </configuration>
       </plugin>
-      
-      <!-- Lombok Compiler Plugin -->
+
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -148,9 +152,6 @@
           </annotationProcessorPaths>
         </configuration>
       </plugin>
-      
-      <!-- Spring Boot Maven Plugin -->
-      <!-- (Already included above with configuration) -->
     </plugins>
   </build>
 

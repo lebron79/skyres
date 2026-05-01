@@ -59,6 +59,11 @@ public class ActivityService {
         if (request.getSeason() != null) activity.setSeason(request.getSeason());
         if (request.getMinAge() != null) activity.setMinAge(request.getMinAge());
         if (request.getImageUrl() != null) activity.setImageUrl(request.getImageUrl());
+        if (request.getDestinationId() != null) {
+            Destination d = destinationRepository.findById(request.getDestinationId())
+                    .orElseThrow(() -> new RuntimeException("Destination not found"));
+            activity.setDestination(d);
+        }
         return activityRepository.save(activity);
     }
 

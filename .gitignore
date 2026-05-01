@@ -13,6 +13,7 @@ back/.mvn/wrapper/maven-wrapper.jar
 .env.local
 application-local.properties
 application-secret.properties
+back/.groq.properties
 
 # ── Logs ─────────────────────────────────────────────
 logs/
