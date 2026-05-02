@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import UserMenu from './UserMenu'
 import Settings from './Settings'
+import { apiFetch } from './api'
 import './App.css'
 
 const UNS = 'https://images.unsplash.com'
@@ -55,7 +56,7 @@ const destinations = [
   },
 ]
 
-const activities = [
+const defaultActivities = [
   {
     id: 1, name: 'Scuba Diving', location: 'Great Barrier Reef', duration: '3h', price: '$85',
     img: `${UNS}/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=700&q=80`,
@@ -149,6 +150,37 @@ export function HomePage() {
   const [search, setSearch] = useState('')
   const { user } = useAuth()
   const [showSettings, setShowSettings] = useState(false)
+  const [activities, setActivities] = useState(defaultActivities)
+  const [activitiesLoading, setActivitiesLoading] = useState(true)
+
+  useEffect(() => {
+    const loadActivities = async () => {
+      setActivitiesLoading(true)
+      try {
+        const data = await apiFetch('/api/activities', { method: 'GET' })
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped = data.map((a, idx) => ({
+            id: a.id ?? `db-${idx}`,
+            name: a.name || 'Activity',
+            location: a.destination
+              ? `${a.destination.city ?? ''}${a.destination.city && a.destination.country ? ', ' : ''}${a.destination.country ?? ''}`.trim() || 'Location not specified'
+              : 'Location not specified',
+            duration: a.type || (a.season ? `${a.season} season` : 'Custom experience'),
+            price: typeof a.price === 'number' ? `$${a.price}` : 'Price on request',
+            img: a.imageUrl || defaultActivities[idx % defaultActivities.length].img,
+            fallback: defaultActivities[idx % defaultActivities.length].fallback,
+          }))
+          setActivities(mapped)
+        }
+      } catch {
+        setActivities(defaultActivities)
+      } finally {
+        setActivitiesLoading(false)
+      }
+    }
+
+    loadActivities()
+  }, [])
 
   return (
     <div>
@@ -283,6 +315,7 @@ export function HomePage() {
             </p>
           </div>
           <div className="act-grid">
+            {activitiesLoading && <p>Loading activities...</p>}
             {activities.map(a => (
               <div key={a.id} className="act-card">
                 <div

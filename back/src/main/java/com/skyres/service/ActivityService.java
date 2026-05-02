@@ -16,6 +16,7 @@ public class ActivityService {
 
     private final ActivityRepository activityRepository;
     private final DestinationRepository destinationRepository;
+    private final ActivityImageService activityImageService;
 
     public List<Activity> findAll(Long destinationId, String type, String season, Double maxPrice) {
         if (destinationId != null) return activityRepository.findByDestinationId(destinationId);
@@ -35,6 +36,10 @@ public class ActivityService {
             destination = destinationRepository.findById(request.getDestinationId())
                     .orElseThrow(() -> new RuntimeException("Destination not found"));
         }
+        String imageUrl = request.getImageUrl();
+        if (imageUrl == null || imageUrl.isBlank()) {
+            imageUrl = activityImageService.resolveImageUrl(request.getName());
+        }
 
         Activity activity = Activity.builder()
                 .name(request.getName())
@@ -43,7 +48,7 @@ public class ActivityService {
                 .price(request.getPrice())
                 .season(request.getSeason())
                 .minAge(request.getMinAge() == null ? 0 : request.getMinAge())
-                .imageUrl(request.getImageUrl())
+                .imageUrl(imageUrl)
                 .destination(destination)
                 .build();
 

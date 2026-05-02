@@ -34,6 +34,7 @@ export default function AdminPanel() {
   const [tab, setTab] = useState('guides')
   const [guides, setGuides] = useState([])
   const [activities, setActivities] = useState([])
+  const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
   const [templatePick, setTemplatePick] = useState('')
@@ -56,6 +57,17 @@ export default function AdminPanel() {
     minAge: '0',
     imageUrl: '',
     destinationId: '',
+  })
+  const [userForm, setUserForm] = useState({
+    id: null,
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    role: 'TOURIST',
+    phone: '',
+    photoUrl: '',
+    bio: '',
   })
 
   const loadGuides = useCallback(async () => {
@@ -84,10 +96,24 @@ export default function AdminPanel() {
     }
   }, [token])
 
+  const loadUsers = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await apiFetch('/api/admin/users', { method: 'GET' }, token)
+      setUsers(Array.isArray(data) ? data : [])
+    } catch (e) {
+      setError(e.message || 'Failed to load users')
+    } finally {
+      setLoading(false)
+    }
+  }, [token])
+
   useEffect(() => {
     if (tab === 'guides') loadGuides()
-    else loadActivities()
-  }, [tab, loadGuides, loadActivities])
+    else if (tab === 'activities') loadActivities()
+    else loadUsers()
+  }, [tab, loadGuides, loadActivities, loadUsers])
 
   useEffect(() => {
     refreshUser()
@@ -107,6 +133,19 @@ export default function AdminPanel() {
       minAge: '0',
       imageUrl: '',
       destinationId: '',
+    })
+
+  const resetUserForm = () =>
+    setUserForm({
+      id: null,
+      firstName: '',
+      lastName: '',
+      email: '',
+      password: '',
+      role: 'TOURIST',
+      phone: '',
+      photoUrl: '',
+      bio: '',
     })
 
   const fillActivityWithGroq = async () => {
@@ -249,6 +288,67 @@ export default function AdminPanel() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const saveUser = async (e) => {
+    e.preventDefault()
+    setError(null)
+    const body = {
+      firstName: userForm.firstName.trim(),
+      lastName: userForm.lastName.trim(),
+      email: userForm.email.trim(),
+      role: userForm.role,
+      phone: userForm.phone.trim() || null,
+      photoUrl: userForm.photoUrl.trim() || null,
+      bio: userForm.bio.trim() || null,
+      ...(userForm.password.trim() ? { password: userForm.password.trim() } : {}),
+    }
+    if (!body.firstName || !body.lastName || !body.email) {
+      setError('First name, last name and email are required.')
+      return
+    }
+    if (!userForm.id && !body.password) {
+      setError('Password is required when creating a new user.')
+      return
+    }
+    try {
+      if (userForm.id) {
+        await apiFetch(`/api/admin/users/${userForm.id}`, { method: 'PUT', body: JSON.stringify(body) }, token)
+      } else {
+        await apiFetch('/api/admin/users', { method: 'POST', body: JSON.stringify(body) }, token)
+      }
+      resetUserForm()
+      await loadUsers()
+    } catch (err) {
+      setError(err.message || 'Save failed')
+    }
+  }
+
+  const editUser = (u) => {
+    setUserForm({
+      id: u.id,
+      firstName: u.firstName ?? '',
+      lastName: u.lastName ?? '',
+      email: u.email ?? '',
+      password: '',
+      role: u.role ?? 'TOURIST',
+      phone: u.phone ?? '',
+      photoUrl: u.photoUrl ?? '',
+      bio: u.bio ?? '',
+    })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const deleteUser = async (id) => {
+    if (!window.confirm('Delete this user?')) return
+    setError(null)
+    try {
+      await apiFetch(`/api/admin/users/${id}`, { method: 'DELETE' }, token)
+      if (userForm.id === id) resetUserForm()
+      await loadUsers()
+    } catch (err) {
+      setError(err.message || 'Delete failed')
+    }
+  }
+
   if (user?.role !== 'ADMIN') {
     return <AccessDenied />
   }
@@ -267,17 +367,29 @@ export default function AdminPanel() {
             <span className="admin-tab-icon">🎯</span>
             Activities
           </button>
+          <button type="button" className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>
+            <span className="admin-tab-icon">🧑</span>
+            Users
+          </button>
         </nav>
         <p className="admin-sidebar-foot">Signed in as<br /><strong>{user?.email}</strong></p>
       </aside>
 
       <main className="admin-main">
         <header className="admin-page-head">
-          <h1>{tab === 'guides' ? 'Guide profiles' : 'Activities catalogue'}</h1>
+          <h1>
+            {tab === 'guides'
+              ? 'Guide profiles'
+              : tab === 'activities'
+                ? 'Activities catalogue'
+                : 'User management'}
+          </h1>
           <p className="admin-page-sub">
             {tab === 'guides'
               ? 'Link platform users to certified guides.'
-              : 'Create experiences — use Groq AI to fill metadata from the activity name.'}
+              : tab === 'activities'
+                ? 'Create experiences — use Groq AI to fill metadata from the activity name.'
+                : 'Create, edit roles, and delete platform users.'}
           </p>
         </header>
 
@@ -563,6 +675,132 @@ export default function AdminPanel() {
                 </tbody>
               </table>
               {!loading && activities.length === 0 && <p className="admin-empty">No activities yet.</p>}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {tab === 'users' && (
+        <div className="admin-grid">
+          <section className="admin-card admin-card--glass">
+            <h2>{userForm.id ? `Edit user #${userForm.id}` : 'New user'}</h2>
+            <p className="admin-hint">Admins can create users and assign role (TOURIST, GUIDE, ADMIN).</p>
+            <form className="admin-form" onSubmit={saveUser}>
+              <label>
+                First name *
+                <input
+                  type="text"
+                  value={userForm.firstName}
+                  onChange={(e) => setUserForm((f) => ({ ...f, firstName: e.target.value }))}
+                  required
+                />
+              </label>
+              <label>
+                Last name *
+                <input
+                  type="text"
+                  value={userForm.lastName}
+                  onChange={(e) => setUserForm((f) => ({ ...f, lastName: e.target.value }))}
+                  required
+                />
+              </label>
+              <label>
+                Email *
+                <input
+                  type="email"
+                  value={userForm.email}
+                  onChange={(e) => setUserForm((f) => ({ ...f, email: e.target.value }))}
+                  required
+                />
+              </label>
+              <label>
+                Password {userForm.id ? '(leave empty to keep current)' : '*'}
+                <input
+                  type="password"
+                  value={userForm.password}
+                  onChange={(e) => setUserForm((f) => ({ ...f, password: e.target.value }))}
+                  required={!userForm.id}
+                />
+              </label>
+              <label>
+                Role *
+                <select
+                  className="admin-select"
+                  value={userForm.role}
+                  onChange={(e) => setUserForm((f) => ({ ...f, role: e.target.value }))}
+                >
+                  <option value="TOURIST">TOURIST</option>
+                  <option value="GUIDE">GUIDE</option>
+                  <option value="ADMIN">ADMIN</option>
+                </select>
+              </label>
+              <label>
+                Phone
+                <input
+                  type="text"
+                  value={userForm.phone}
+                  onChange={(e) => setUserForm((f) => ({ ...f, phone: e.target.value }))}
+                />
+              </label>
+              <label>
+                Photo URL
+                <input
+                  type="url"
+                  value={userForm.photoUrl}
+                  onChange={(e) => setUserForm((f) => ({ ...f, photoUrl: e.target.value }))}
+                />
+              </label>
+              <label>
+                Bio
+                <textarea
+                  rows={3}
+                  value={userForm.bio}
+                  onChange={(e) => setUserForm((f) => ({ ...f, bio: e.target.value }))}
+                />
+              </label>
+              <div className="admin-form-actions">
+                <button type="submit" className="admin-btn admin-btn-primary">{userForm.id ? 'Update' : 'Create'}</button>
+                {userForm.id && (
+                  <button type="button" className="admin-btn admin-btn-ghost" onClick={resetUserForm}>Cancel edit</button>
+                )}
+              </div>
+            </form>
+          </section>
+
+          <section className="admin-card admin-card--table admin-card--glass">
+            <div className="admin-card-head">
+              <h2>All users</h2>
+              <button type="button" className="admin-btn admin-btn-ghost" onClick={loadUsers} disabled={loading}>Refresh</button>
+            </div>
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Phone</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u) => (
+                    <tr key={u.id}>
+                      <td>{u.id}</td>
+                      <td>{u.firstName} {u.lastName}</td>
+                      <td>{u.email}</td>
+                      <td>{u.role}</td>
+                      <td>{u.phone ?? '—'}</td>
+                      <td className="admin-actions">
+                        <button type="button" className="admin-link" onClick={() => editUser(u)}>Edit</button>
+                        <button type="button" className="admin-link danger" onClick={() => deleteUser(u.id)}>Delete</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!loading && users.length === 0 && <p className="admin-empty">No users found.</p>}
             </div>
           </section>
         </div>
