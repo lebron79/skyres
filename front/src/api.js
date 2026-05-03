@@ -1,4 +1,4 @@
-export const API_BASE = 'http://localhost:8080'
+export const API_BASE = 'http://localhost:9000'
 
 export function apiUrl(path) {
   const p = path.startsWith('/') ? path : `/${path}`
