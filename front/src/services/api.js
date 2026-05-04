@@ -7,12 +7,15 @@ export function apiUrl(path) {
 
 /** @param {string | null | undefined} token */
 export async function apiFetch(path, options = {}, token) {
+  const authToken =
+    token ||
+    (typeof localStorage !== 'undefined' ? localStorage.getItem('authToken') : null)
   const headers = { ...options.headers }
   const hasBody = options.body != null && options.body !== ''
   if (hasBody && !headers['Content-Type']) {
     headers['Content-Type'] = 'application/json'
   }
-  if (token) headers.Authorization = `Bearer ${token}`
+  if (authToken) headers.Authorization = `Bearer ${authToken}`
 
   const res = await fetch(apiUrl(path), { ...options, headers })
   if (!res.ok) {

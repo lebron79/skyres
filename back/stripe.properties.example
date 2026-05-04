@@ -1,0 +1,3 @@
+# Copy to back/.stripe.properties (gitignored) or set env STRIPE_SECRET_KEY.
+# Get keys: Stripe Dashboard → Developers → API keys (Test mode).
+stripe.secret.key=sk_test_REPLACE_ME

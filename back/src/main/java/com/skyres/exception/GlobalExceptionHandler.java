@@ -1,5 +1,6 @@
 package com.skyres.exception;
 
+import com.stripe.exception.StripeException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -37,6 +38,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<String> handleUnavailable(IllegalStateException ex) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(StripeException.class)
+    public ResponseEntity<String> handleStripe(StripeException ex) {
+        String msg = ex.getUserMessage() != null ? ex.getUserMessage() : ex.getMessage();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(msg != null ? msg : "Stripe error.");
     }
 
     @ExceptionHandler(RuntimeException.class)

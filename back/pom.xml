@@ -80,6 +80,13 @@
       <artifactId>spring-boot-starter-mail</artifactId>
     </dependency>
 
+    <!-- ── Stripe ── -->
+    <dependency>
+      <groupId>com.stripe</groupId>
+      <artifactId>stripe-java</artifactId>
+      <version>28.2.0</version>
+    </dependency>
+
     <!-- ── Swagger / OpenAPI ── -->
     <dependency>
       <groupId>org.springdoc</groupId>

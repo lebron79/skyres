@@ -1,51 +1,44 @@
-import { useState, useEffect } from 'react'
-import { Link , useNavigate  } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
-import UserMenu from "../components/UserMenu.jsx";
-import Settings from './Settings'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext.jsx'
 import { destinationAPI } from '../services/destinationAPI'
+import { apiFetch } from '../services/api'
+import { humanizeApiError } from '../checkoutUi'
 import '../App.css'
 
 const UNS = 'https://images.unsplash.com'
 
-const activities = [
+const defaultActivities = [
   {
-    id: 1, name: 'Scuba Diving', location: 'Great Barrier Reef', duration: '3h', price: '$85',
+    id: 1, name: 'Scuba Diving', location: 'Great Barrier Reef', duration: '3h', price: '$85', priceAmount: 85,
     img: `${UNS}/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=700&q=80`,
     fallback: '#01579b',
   },
   {
-    id: 2, name: 'Hot Air Balloon', location: 'Cappadocia, Turkey', duration: '2h', price: '$120',
+    id: 2, name: 'Hot Air Balloon', location: 'Cappadocia, Turkey', duration: '2h', price: '$120', priceAmount: 120,
     img: `${UNS}/photo-1507608616759-54f48f0af0ee?auto=format&fit=crop&w=700&q=80`,
     fallback: '#e65100',
   },
   {
-    id: 3, name: 'Desert Safari', location: 'Dubai, UAE', duration: '6h', price: '$95',
+    id: 3, name: 'Desert Safari', location: 'Dubai, UAE', duration: '6h', price: '$95', priceAmount: 95,
     img: `${UNS}/photo-1452860606245-08befc0ff44b?auto=format&fit=crop&w=700&q=80`,
     fallback: '#827717',
   },
   {
-    id: 4, name: 'Northern Lights', location: 'Tromsø, Norway', duration: '4h', price: '$110',
+    id: 4, name: 'Northern Lights', location: 'Tromsø, Norway', duration: '4h', price: '$110', priceAmount: 110,
     img: `${UNS}/photo-1531366936337-7c912a4589a7?auto=format&fit=crop&w=700&q=80`,
     fallback: '#1a237e',
   },
   {
-    id: 5, name: 'Mountain Trek', location: 'Nepal Himalayas', duration: '8h', price: '$60',
+    id: 5, name: 'Mountain Trek', location: 'Nepal Himalayas', duration: '8h', price: '$60', priceAmount: 60,
     img: `${UNS}/photo-1551632811-561732d1e306?auto=format&fit=crop&w=700&q=80`,
     fallback: '#1b5e20',
   },
   {
-    id: 6, name: 'Cooking Class', location: 'Tuscany, Italy', duration: '3h', price: '$75',
+    id: 6, name: 'Cooking Class', location: 'Tuscany, Italy', duration: '3h', price: '$75', priceAmount: 75,
     img: `${UNS}/photo-1556909114-f6e7ad7d3136?auto=format&fit=crop&w=700&q=80`,
     fallback: '#880e4f',
   },
-]
-
-const reviews = [
-  { id: 1, name: 'Sophie Martin',  country: 'Paris, France',   avatar: 'SM', color: '#7C3AED', stars: 5, text: 'Booked three hotels in one afternoon. The AI suggestions nailed it — Bali matched every preference I had. Will never plan a trip the old way again.' },
-  { id: 2, name: 'Kenji Nakamura', country: 'Tokyo, Japan',    avatar: 'KN', color: '#0C7A6E', stars: 5, text: 'The PDF invoice with a QR code came through instantly. The guide I found spoke fluent Japanese and knew every hidden gem in Kyoto.' },
-  { id: 3, name: 'Amara Diallo',   country: 'Dakar, Senegal',  avatar: 'AD', color: '#E8601A', stars: 5, text: 'I used the budget filter and found a 5-star resort in Marrakech for half what I expected. The experience was absolutely surreal.' },
-  { id: 4, name: 'Luca Ferretti',  country: 'Rome, Italy',     avatar: 'LF', color: '#059669', stars: 5, text: 'The interactive map made it so easy to spot which hotels were close to the Amalfi coastline. Booked in 5 minutes flat.' },
 ]
 
 const team = [
@@ -97,12 +90,29 @@ const heroCards = [
   { cls: 'fc-2', img: `${UNS}/photo-1570077188670-e3a8d69ac5ff?auto=format&fit=crop&w=300&q=70`, label: 'Santorini, Greece'  },
   { cls: 'fc-3', img: `${UNS}/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=300&q=70`, label: 'Tokyo, Japan'       },
 ]
+
+const guideTopColors = ['#0C7A6E', '#1565c0', '#6a1b9a', '#b45309', '#0d9488', '#1e40af']
+
 export function HomePage() {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
-  const { user, token } = useAuth() 
-  const [showSettings, setShowSettings] = useState(false)
+  const { user, token, isAuthenticated } = useAuth()
   const [destinations, setDestinations] = useState([])
+  const [activities, setActivities] = useState(() => [...defaultActivities])
+  const [activitiesLoading, setActivitiesLoading] = useState(true)
+  const [guides, setGuides] = useState([])
+  const [guidesLoading, setGuidesLoading] = useState(true)
+  const [stories, setStories] = useState([])
+  const [storiesLoading, setStoriesLoading] = useState(true)
+  const [storyForm, setStoryForm] = useState({
+    displayName: '',
+    locationLabel: '',
+    storyText: '',
+    stars: 5,
+  })
+  const [storySaving, setStorySaving] = useState(false)
+  const [storyMessage, setStoryMessage] = useState(null)
+  const [storyError, setStoryError] = useState(null)
 
   useEffect(() => {
     const fetchDestinations = async () => {
@@ -114,13 +124,161 @@ export function HomePage() {
         console.error(err)
       }
     }
-
-    if (token) fetchDestinations()
+    fetchDestinations()
   }, [token])
+
+  useEffect(() => {
+    const loadActivities = async () => {
+      setActivitiesLoading(true)
+      try {
+        const data = await apiFetch('/api/activities', { method: 'GET' })
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped = data.map((a, idx) => ({
+            id: a.id ?? `db-${idx}`,
+            name: a.name || 'Activity',
+            location: a.destination
+              ? `${a.destination.city ?? ''}${a.destination.city && a.destination.country ? ', ' : ''}${a.destination.country ?? ''}`.trim() || 'Location not specified'
+              : 'Location not specified',
+            duration: a.type || (a.season ? `${a.season} season` : 'Custom experience'),
+            price: typeof a.price === 'number' ? `$${a.price}` : 'Price on request',
+            priceAmount: typeof a.price === 'number' ? a.price : null,
+            img: a.imageUrl || defaultActivities[idx % defaultActivities.length].img,
+            fallback: defaultActivities[idx % defaultActivities.length].fallback,
+          }))
+          setActivities(mapped)
+        }
+      } catch {
+        setActivities([...defaultActivities])
+      } finally {
+        setActivitiesLoading(false)
+      }
+    }
+    loadActivities()
+  }, [])
+
+  useEffect(() => {
+    const loadGuides = async () => {
+      setGuidesLoading(true)
+      try {
+        const data = await apiFetch('/api/guides', { method: 'GET' })
+        setGuides(Array.isArray(data) ? data : [])
+      } catch {
+        setGuides([])
+      } finally {
+        setGuidesLoading(false)
+      }
+    }
+    loadGuides()
+  }, [])
+
+  useEffect(() => {
+    const loadStories = async () => {
+      setStoriesLoading(true)
+      try {
+        const data = await apiFetch('/api/stories', { method: 'GET' })
+        setStories(Array.isArray(data) ? data : [])
+      } catch {
+        setStories([])
+      } finally {
+        setStoriesLoading(false)
+      }
+    }
+    loadStories()
+  }, [])
+
+  useEffect(() => {
+    if (!user) return
+    const dn = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()
+    if (dn) {
+      setStoryForm((f) => ({ ...f, displayName: f.displayName || dn }))
+    }
+  }, [user])
+
+  const initialsFromName = (name) => {
+    const p = (name || '').trim().split(/\s+/).filter(Boolean)
+    if (p.length === 0) return '?'
+    if (p.length === 1) return p[0].slice(0, 2).toUpperCase()
+    return `${p[0][0]}${p[p.length - 1][0]}`.toUpperCase()
+  }
+
+  const submitStory = async (e) => {
+    e.preventDefault()
+    if (!isAuthenticated || !token) {
+      navigate('/login', { state: { redirectTo: '/#reviews' } })
+      return
+    }
+    setStorySaving(true)
+    setStoryError(null)
+    setStoryMessage(null)
+    try {
+      await apiFetch(
+        '/api/stories',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            displayName: storyForm.displayName.trim(),
+            locationLabel: storyForm.locationLabel.trim(),
+            storyText: storyForm.storyText.trim(),
+            stars: Number(storyForm.stars),
+          }),
+        },
+        token
+      )
+      setStoryMessage('Thanks — your story is live!')
+      setStoryForm((f) => ({ ...f, storyText: '' }))
+      const data = await apiFetch('/api/stories', { method: 'GET' })
+      setStories(Array.isArray(data) ? data : [])
+    } catch (err) {
+      setStoryError(humanizeApiError(err.message || 'Could not save your story.'))
+    } finally {
+      setStorySaving(false)
+    }
+  }
+
+  const sortedGuides = [...guides].sort((a, b) => {
+    if (a.available !== b.available) return a.available ? -1 : 1
+    const an = `${a.user?.firstName ?? ''} ${a.user?.lastName ?? ''}`.trim()
+    const bn = `${b.user?.firstName ?? ''} ${b.user?.lastName ?? ''}`.trim()
+    return an.localeCompare(bn)
+  })
+
+  const goToActivityPayment = (a) => {
+    const params = new URLSearchParams()
+    params.set('type', 'activity')
+    params.set('id', String(a.id))
+    params.set('name', a.name)
+    if (a.priceAmount != null && Number.isFinite(a.priceAmount)) {
+      params.set('price', String(a.priceAmount))
+    }
+    const url = `/payment?${params.toString()}`
+    if (!isAuthenticated) {
+      navigate('/login', { state: { redirectTo: url } })
+      return
+    }
+    navigate(url)
+  }
+
+  const goToGuidePayment = (g) => {
+    const first = g.user?.firstName ?? ''
+    const last = g.user?.lastName ?? ''
+    const displayName = `${first} ${last}`.trim() || `Guide #${g.id}`
+    const params = new URLSearchParams()
+    params.set('type', 'guide')
+    params.set('id', String(g.id))
+    params.set('name', displayName)
+    if (g.hourlyRate != null && Number.isFinite(Number(g.hourlyRate))) {
+      params.set('price', String(g.hourlyRate))
+    }
+    const url = `/payment?${params.toString()}`
+    if (!isAuthenticated) {
+      navigate('/login', { state: { redirectTo: url } })
+      return
+    }
+    navigate(url)
+  }
 
   return (
     <div>
-      
 
       {/* ── Hero ── */}
       <section className="hero">
@@ -223,6 +381,80 @@ export function HomePage() {
         </div>
       </section>
 
+      {/* ── Guides (from API) ── */}
+      <section id="guides" className="section">
+        <div className="container">
+          <div className="section-header split-header">
+            <div>
+              <div className="section-label">Local experts</div>
+              <h2 className="section-heading">Browse guides</h2>
+            </div>
+            <p className="section-body">
+              Certified guides loaded from our database — languages, regions, and hourly rates.
+              Book a session to continue to checkout (Stripe next).
+            </p>
+          </div>
+          {guidesLoading && <p className="guides-status">Loading guides...</p>}
+          {!guidesLoading && sortedGuides.length === 0 && (
+            <p className="guides-status">No guides are listed yet. Check back soon.</p>
+          )}
+          <div className="guide-grid">
+            {!guidesLoading &&
+              sortedGuides.map((g, idx) => {
+                const first = g.user?.firstName ?? ''
+                const last = g.user?.lastName ?? ''
+                const initials = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'G'
+                const displayName = `${first} ${last}`.trim() || `Guide #${g.id}`
+                const rate =
+                  g.hourlyRate != null && Number.isFinite(Number(g.hourlyRate))
+                    ? `$${g.hourlyRate}/hr`
+                    : 'Rate on request'
+                const rating =
+                  g.averageRating != null && Number(g.averageRating) > 0
+                    ? Number(g.averageRating).toFixed(1)
+                    : null
+                const topColor = guideTopColors[idx % guideTopColors.length]
+                return (
+                  <div key={g.id} className={`guide-card${g.available ? '' : ' guide-card-unavailable'}`}>
+                    <div
+                      className="guide-card-top"
+                      style={{
+                        background: `linear-gradient(135deg, ${topColor} 0%, #1a1714 100%)`,
+                      }}
+                    >
+                      <div className="guide-avatar" aria-hidden>
+                        {initials}
+                      </div>
+                      <span className={`guide-pill${g.available ? ' guide-pill-on' : ''}`}>
+                        {g.available ? 'Available' : 'Unavailable'}
+                      </span>
+                    </div>
+                    <div className="guide-body">
+                      <div className="guide-name">{displayName}</div>
+                      <div className="guide-meta">
+                        {g.region && <span>📍 {g.region}</span>}
+                        {g.languages && <span>🗣 {g.languages}</span>}
+                      </div>
+                      <div className="guide-row">
+                        <span className="guide-rate">{rate}</span>
+                        {rating && <span className="guide-stars">★ {rating}</span>}
+                      </div>
+                      <button
+                        type="button"
+                        className="guide-btn"
+                        disabled={!g.available}
+                        onClick={() => goToGuidePayment(g)}
+                      >
+                        Book session
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+          </div>
+        </div>
+      </section>
+
       {/* ── Activities ── */}
       <section id="activities" className="section">
         <div className="container">
@@ -237,6 +469,7 @@ export function HomePage() {
             </p>
           </div>
           <div className="act-grid">
+            {activitiesLoading && <p className="guides-status">Loading activities...</p>}
             {activities.map(a => (
               <div key={a.id} className="act-card">
                 <div
@@ -256,7 +489,13 @@ export function HomePage() {
                     <span>📍 {a.location}</span>
                     <span>⏱ {a.duration}</span>
                   </div>
-                  <button className="act-btn">Book experience</button>
+                  <button
+                    type="button"
+                    className="act-btn"
+                    onClick={() => goToActivityPayment(a)}
+                  >
+                    Book experience
+                  </button>
                 </div>
               </div>
             ))}
@@ -371,28 +610,122 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* ── Reviews ── */}
-      <section className="section">
+      {/* ── Stories (dynamic) ── */}
+      <section id="reviews" className="section stories-section">
         <div className="container">
           <div className="section-header centered">
             <div className="section-label">Travellers love us</div>
             <h2 className="section-heading">Real stories, real adventures</h2>
-            <p className="section-body">Over 12,000 trips planned through SkyRes. Here's what some of them said.</p>
+            <p className="section-body">
+              Stories are saved in the database — add yours on the left and scroll fresh voices on the right.
+            </p>
           </div>
-          <div className="reviews-grid">
-            {reviews.map(r => (
-              <div key={r.id} className="review-card">
-                <div className="review-stars">{'★'.repeat(r.stars)}</div>
-                <p className="review-text">"{r.text}"</p>
-                <div className="review-author">
-                  <div className="review-avatar" style={{ background: r.color }}>{r.avatar}</div>
-                  <div>
-                    <div className="review-name">{r.name}</div>
-                    <div className="review-country">{r.country}</div>
+
+          <div className="stories-split">
+            <div className="stories-write">
+              <div className="stories-write-glow" aria-hidden />
+              <div className="stories-write-inner">
+                <p className="stories-write-kicker">Your turn</p>
+                <h3 className="stories-write-title">Write your story</h3>
+                <p className="stories-write-lead">
+                  Tell others how SkyRes helped you plan, book, or explore. Min. 20 characters — be real, be specific.
+                </p>
+                {!isAuthenticated ? (
+                  <div className="stories-guest-gate">
+                    <p>Sign in to publish your story to the feed.</p>
+                    <Link to="/login" state={{ redirectTo: '/#reviews' }} className="stories-guest-btn">
+                      Sign in to share
+                    </Link>
                   </div>
-                </div>
+                ) : (
+                  <form className="stories-form" onSubmit={submitStory}>
+                    <label className="stories-label">
+                      Display name
+                      <input
+                        className="stories-input"
+                        value={storyForm.displayName}
+                        onChange={(e) => setStoryForm((f) => ({ ...f, displayName: e.target.value }))}
+                        placeholder="Alex Rivera"
+                        required
+                        maxLength={120}
+                      />
+                    </label>
+                    <label className="stories-label">
+                      Location
+                      <input
+                        className="stories-input"
+                        value={storyForm.locationLabel}
+                        onChange={(e) => setStoryForm((f) => ({ ...f, locationLabel: e.target.value }))}
+                        placeholder="Casablanca, Morocco"
+                        required
+                        maxLength={160}
+                      />
+                    </label>
+                    <label className="stories-label">
+                      Rating
+                      <select
+                        className="stories-input stories-select"
+                        value={storyForm.stars}
+                        onChange={(e) => setStoryForm((f) => ({ ...f, stars: Number(e.target.value) }))}
+                      >
+                        {[5, 4, 3, 2, 1].map((n) => (
+                          <option key={n} value={n}>
+                            {'★'.repeat(n)}{'☆'.repeat(5 - n)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="stories-label">
+                      Your story
+                      <textarea
+                        className="stories-textarea"
+                        value={storyForm.storyText}
+                        onChange={(e) => setStoryForm((f) => ({ ...f, storyText: e.target.value }))}
+                        placeholder="What surprised you? What would you tell a friend?"
+                        required
+                        minLength={20}
+                        maxLength={2000}
+                        rows={5}
+                      />
+                    </label>
+                    {storyError && <p className="stories-form-error">{storyError}</p>}
+                    {storyMessage && <p className="stories-form-success">{storyMessage}</p>}
+                    <button type="submit" className="stories-submit" disabled={storySaving}>
+                      {storySaving ? 'Publishing…' : 'Publish to the wall'}
+                    </button>
+                  </form>
+                )}
               </div>
-            ))}
+            </div>
+
+            <div className="stories-feed-wrap">
+              <div className="stories-feed-head">
+                <span className="stories-feed-pill">Live feed</span>
+                <h3 className="stories-feed-title">Community voices</h3>
+              </div>
+              <div className="stories-feed">
+                {storiesLoading && <p className="stories-feed-loading">Loading stories…</p>}
+                {!storiesLoading && stories.length === 0 && (
+                  <p className="stories-feed-empty">No stories yet. Be the first.</p>
+                )}
+                {!storiesLoading &&
+                  stories.map((s) => (
+                    <article key={s.id} className="story-card">
+                      <div className="story-card-stars">{'★'.repeat(s.stars)}{'☆'.repeat(5 - s.stars)}</div>
+                      <p className="story-card-text">&ldquo;{s.storyText}&rdquo;</p>
+                      <div className="story-card-footer">
+                        <div className="story-card-avatar" style={{ background: s.avatarColor || '#0C7A6E' }}>
+                          {initialsFromName(s.displayName)}
+                        </div>
+                        <div>
+                          <div className="story-card-name">{s.displayName}</div>
+                          <div className="story-card-loc">{s.locationLabel}</div>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -470,14 +803,15 @@ export function HomePage() {
         </div>
         <ul className="footer-links">
           <li><a href="#destinations">Destinations</a></li>
+          <li><a href="#guides">Guides</a></li>
           <li><a href="#activities">Activities</a></li>
           <li><a href="#how">How it works</a></li>
+          <li><a href="#reviews">Stories</a></li>
           <li><a href="#team">Team</a></li>
           <li><a href="#tech">Stack</a></li>
         </ul>
         <span className="footer-copy">Smart Tourism Platform — Spring Boot · React · MySQL</span>
       </footer>
-      {showSettings && <Settings onClose={() => setShowSettings(false)} />}
     </div>
   )
 }

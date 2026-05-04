@@ -14,6 +14,7 @@ back/.mvn/wrapper/maven-wrapper.jar
 application-local.properties
 application-secret.properties
 back/.groq.properties
+back/.stripe.properties
 
 # ── Logs ─────────────────────────────────────────────
 logs/

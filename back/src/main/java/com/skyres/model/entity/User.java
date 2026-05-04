@@ -1,5 +1,6 @@
 package com.skyres.model.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.skyres.model.enums.Role;
 import jakarta.persistence.*;
 import lombok.*;
@@ -25,6 +26,7 @@ public class User {
     private String email;
 
     @Column(nullable = false)
+    @JsonIgnore
     private String password;
 
     private String photoUrl;

@@ -1,7 +1,21 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext.jsx'
 import './Login.css'
+
+const SLIDESHOW_URLS = [
+  'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=80',
+  'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1920&q=80',
+  'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=1920&q=80',
+  'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.1.0&auto=format&fit=crop&w=1920&q=80',
+  'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1920&q=80',
+  'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?ixlib=rb-4.1.0&auto=format&fit=crop&w=1920&q=80',
+]
+
+function safeRedirectPath(raw) {
+  if (typeof raw !== 'string' || !raw.startsWith('/') || raw.startsWith('//')) return null
+  return raw
+}
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -16,6 +30,25 @@ export default function Login() {
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const { login, register } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  const goAfterAuth = () => {
+    const target = safeRedirectPath(location.state?.redirectTo)
+    navigate(target ?? '/', { replace: true })
+  }
+
+  const [slideIndex, setSlideIndex] = useState(0)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return undefined
+    }
+    const id = setInterval(() => {
+      setSlideIndex((i) => (i + 1) % SLIDESHOW_URLS.length)
+    }, 5200)
+    return () => clearInterval(id)
+  }, [])
 
   const validateEmail = (email) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -45,7 +78,7 @@ export default function Login() {
     setLoading(true)
     try {
       await login(email, password)
-      navigate('/'); 
+      goAfterAuth()
     } catch (err) {
       setError(err.message || 'Login failed')
     }
@@ -86,16 +119,33 @@ export default function Login() {
     setLoading(true)
     try {
       await register(firstName.trim(), lastName.trim(), email.trim(), password, phone.trim())
-      navigate('/'); 
+      goAfterAuth()
     } catch (err) {
       setError(err.message || 'Registration failed')
     }
     setLoading(false)
   }
-const navigate = useNavigate();
+
   return (
     <div className="login-page">
-      <div className="login-container">
+      <div className="login-bg-blur-wrap" aria-hidden>
+        <div className="login-slideshow">
+          {SLIDESHOW_URLS.map((url, i) => (
+            <div
+              key={url}
+              className={`login-slide ${i === slideIndex ? 'login-slide--active' : ''}`}
+              style={{ backgroundImage: `url(${url})` }}
+            />
+          ))}
+          <div className="login-slide-scrim" />
+        </div>
+      </div>
+
+      <Link to="/" className="login-back-home">← SkyRes home</Link>
+
+      <div className="login-layout">
+        <div className="login-center-stack">
+          <div className="login-container login-modal-card">
         {/* Logo section */}
         <div className="login-header">
           <div className="login-logo-mark">✈</div>
@@ -284,9 +334,22 @@ const navigate = useNavigate();
             </div>
           </form>
         )}
-      </div>
+          </div>
 
-      <div className="login-bg" />
+          <div className="login-slide-dots" role="tablist" aria-label="Background photos">
+            {SLIDESHOW_URLS.map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                className={`login-slide-dot ${i === slideIndex ? 'login-slide-dot--active' : ''}`}
+                aria-label={`Show background ${i + 1}`}
+                aria-selected={i === slideIndex}
+                onClick={() => setSlideIndex(i)}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
