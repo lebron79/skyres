@@ -13,47 +13,29 @@ import java.util.List;
 public interface HotelRepository
         extends JpaRepository<Hotel, Long>, JpaSpecificationExecutor<Hotel> {
 
-    // ─── Filtre par étoiles ──────────────────────────────────────────────────
-
+    // ─── Filtre par étoiles ─────────────────────────────────────────
     List<Hotel> findByStars(int stars);
-
     List<Hotel> findByStarsGreaterThanEqual(int minStars);
-
     List<Hotel> findByStarsBetween(int minStars, int maxStars);
 
-    // ─── Filtre par commentaire client (note moyenne) ────────────────────────
-    // Fabuleux  : note >= 9.0
-    // Exceptionnel : note >= 9.5
-    // Superbe   : note >= 8.0
-    // Très bien : note >= 8.4  (chevauchement géré côté service)
-    // Bien      : note >= 7.5
-    // Agréable  : note >= 6.0
-
+    // ─── Filtre par note (averageRating) ───────────────────────────
     List<Hotel> findByAverageRatingGreaterThanEqual(Double minRating);
-
     List<Hotel> findByAverageRatingBetween(Double minRating, Double maxRating);
 
-    // ─── Filtre par destination ──────────────────────────────────────────────
-
+    // ─── Filtre par destination ────────────────────────────────────
     List<Hotel> findByDestinationId(Long destinationId);
 
-    // ─── Filtre par disponibilité ────────────────────────────────────────────
+    @Query("SELECT h FROM Hotel h WHERE h.destination.id = :destinationId ORDER BY h.averageRating DESC")
+    List<Hotel> findTopRatedByDestination(@Param("destinationId") Long destinationId);
 
+    // ─── Filtre par disponibilité ─────────────────────────────────
     List<Hotel> findByAvailable(boolean available);
 
-    // ─── Combinaison étoiles + note ─────────────────────────────────────────
-
+    // ─── Combinaison étoiles + note ───────────────────────────────
     List<Hotel> findByStarsAndAverageRatingGreaterThanEqual(int stars, Double minRating);
+    List<Hotel> findByStarsGreaterThanEqualAndAverageRatingGreaterThanEqual(int minStars, Double minRating);
 
-    List<Hotel> findByStarsGreaterThanEqualAndAverageRatingGreaterThanEqual(
-            int minStars, Double minRating);
-
-    // ─── Filtres multi-critères via JPQL ─────────────────────────────────────
-
-    /**
-     * Filtre complet : destination + étoiles min + note min + disponibilité.
-     * Les paramètres facultatifs sont contournés en passant NULL depuis le service.
-     */
+    // ─── Filtre multi‑critères (JPQL) ─────────────────────────────
     @Query("""
             SELECT h FROM Hotel h
             WHERE (:destinationId IS NULL OR h.destination.id = :destinationId)
@@ -71,23 +53,10 @@ public interface HotelRepository
             @Param("available")     Boolean available
     );
 
-    // ─── Prix ────────────────────────────────────────────────────────────────
-
+    // ─── Recherche par prix ───────────────────────────────────────
     List<Hotel> findByPricePerNightBetween(Double minPrice, Double maxPrice);
-
     List<Hotel> findByPricePerNightLessThanEqual(Double maxPrice);
 
-    // ─── Recherche par nom ───────────────────────────────────────────────────
-
+    // ─── Recherche par nom (insensible à la casse) ────────────────
     List<Hotel> findByNameContainingIgnoreCase(String keyword);
-
-    // ─── Top hôtels d'une destination par note ───────────────────────────────
-
-    @Query("""
-            SELECT h FROM Hotel h
-            WHERE h.destination.id = :destinationId
-              AND h.available = true
-            ORDER BY h.averageRating DESC
-            """)
-    List<Hotel> findTopRatedByDestination(@Param("destinationId") Long destinationId);
 }
