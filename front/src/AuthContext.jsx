@@ -8,7 +8,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const API_BASE = 'http://localhost:8080';
+  const API_BASE = 'http://localhost:9000';
 
   const fetchUserProfile = useCallback(async (authToken) => {
     try {

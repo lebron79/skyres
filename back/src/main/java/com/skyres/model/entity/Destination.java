@@ -1,7 +1,12 @@
 package com.skyres.model.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import lombok.*;
+
+import java.util.List;
 
 @Entity
 @Table(name = "destinations")
@@ -26,8 +31,14 @@ public class Destination {
     private String climate;
 
     private Double estimatedBudget;
-
+    
+    @DecimalMin("0.0")
+    @DecimalMax("5.0")
     private Double averageRating;
 
     private boolean trending = false;
+
+    @OneToMany(mappedBy = "destination", cascade = CascadeType.ALL)
+    @JsonIgnore
+    private List<Hotel> hotels;
 }
