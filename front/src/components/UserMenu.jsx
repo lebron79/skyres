@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useAuth } from './AuthContext'
+import { useAuth } from '../context/AuthContext'
 
 export default function UserMenu({ onSettingsClick }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -12,7 +12,7 @@ export default function UserMenu({ onSettingsClick }) {
       <button className="user-menu-trigger" onClick={() => setIsOpen(!isOpen)}>
         <div className="user-avatar">
           {user.photoUrl ? (
-            <img src={`http://localhost:8080${user.photoUrl}`} alt={user.firstName} />
+            <img src={`http://localhost:9000${user.photoUrl}`} alt={user.firstName} />
           ) : (
             <>{user.firstName?.[0]}{user.lastName?.[0]}</>
           )}
@@ -31,7 +31,7 @@ export default function UserMenu({ onSettingsClick }) {
           <div className="user-menu-item user-info">
             <div className="user-avatar-lg">
               {user.photoUrl ? (
-                <img src={`http://localhost:8080${user.photoUrl}`} alt={user.firstName} />
+                <img src={`http://localhost:9000${user.photoUrl}`} alt={user.firstName} />
               ) : (
                 <>{user.firstName?.[0]}{user.lastName?.[0]}</>
               )}

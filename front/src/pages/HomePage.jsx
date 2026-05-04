@@ -1,59 +1,12 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { useAuth } from './AuthContext'
-import UserMenu from './UserMenu'
+import { useState, useEffect } from 'react'
+import { Link , useNavigate  } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import UserMenu from "../components/UserMenu.jsx";
 import Settings from './Settings'
-import './App.css'
+import { destinationAPI } from '../services/destinationAPI'
+import '../App.css'
 
 const UNS = 'https://images.unsplash.com'
-
-const destinations = [
-  {
-    id: 1, name: 'Bali', country: 'Indonesia', badge: 'Trending', stars: 5, tall: true,
-    img: `${UNS}/photo-1537996088602-65a78a2ba015?auto=format&fit=crop&w=800&q=80`,
-    fallback: '#1a5276',
-  },
-  {
-    id: 2, name: 'Paris', country: 'France', badge: 'Popular', stars: 5, tall: false,
-    img: `${UNS}/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=800&q=80`,
-    fallback: '#7d6608',
-  },
-  {
-    id: 3, name: 'Tokyo', country: 'Japan', badge: 'Must-see', stars: 5, tall: false,
-    img: `${UNS}/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=800&q=80`,
-    fallback: '#7b241c',
-  },
-  {
-    id: 4, name: 'Santorini', country: 'Greece', badge: 'Romantic', stars: 5, tall: false,
-    img: `${UNS}/photo-1570077188670-e3a8d69ac5ff?auto=format&fit=crop&w=800&q=80`,
-    fallback: '#154360',
-  },
-  {
-    id: 5, name: 'Marrakech', country: 'Morocco', badge: 'Culture', stars: 4, tall: false,
-    img: `${UNS}/photo-1508193638397-1c4234db14d8?auto=format&fit=crop&w=800&q=80`,
-    fallback: '#6e2f1a',
-  },
-  {
-    id: 6, name: 'Swiss Alps', country: 'Switzerland', badge: 'Adventure', stars: 5, tall: false,
-    img: `${UNS}/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=800&q=80`,
-    fallback: '#1d4e1d',
-  },
-  {
-    id: 7, name: 'Maldives', country: 'Maldives', badge: 'Luxury', stars: 5, tall: false,
-    img: `${UNS}/photo-1514282401047-d79a71a590e8?auto=format&fit=crop&w=800&q=80`,
-    fallback: '#0e6655',
-  },
-  {
-    id: 8, name: 'Dubai', country: 'UAE', badge: 'Modern', stars: 5, tall: false,
-    img: `${UNS}/photo-1518684079-3c830dcef090?auto=format&fit=crop&w=800&q=80`,
-    fallback: '#4a235a',
-  },
-  {
-    id: 9, name: 'Amalfi Coast', country: 'Italy', badge: 'Scenic', stars: 5, tall: false,
-    img: `${UNS}/photo-1587474260584-136574297316?auto=format&fit=crop&w=800&q=80`,
-    fallback: '#0a3d3d',
-  },
-]
 
 const activities = [
   {
@@ -144,34 +97,30 @@ const heroCards = [
   { cls: 'fc-2', img: `${UNS}/photo-1570077188670-e3a8d69ac5ff?auto=format&fit=crop&w=300&q=70`, label: 'Santorini, Greece'  },
   { cls: 'fc-3', img: `${UNS}/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=300&q=70`, label: 'Tokyo, Japan'       },
 ]
-
 export function HomePage() {
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
-  const { user } = useAuth()
+  const { user, token } = useAuth() 
   const [showSettings, setShowSettings] = useState(false)
+  const [destinations, setDestinations] = useState([])
+
+  useEffect(() => {
+    const fetchDestinations = async () => {
+      try {
+        const api = destinationAPI(token)
+        const data = await api.getAll()
+        setDestinations(data || [])
+      } catch (err) {
+        console.error(err)
+      }
+    }
+
+    if (token) fetchDestinations()
+  }, [token])
 
   return (
     <div>
-      {/* ── Navbar ── */}
-      <nav className="navbar">
-        <div className="nav-logo">
-          <div className="nav-logo-mark">✈</div>
-          SkyRes
-        </div>
-        <ul className="nav-links">
-          <li><a href="#destinations">Destinations</a></li>
-          <li><a href="#activities">Activities</a></li>
-          <li><a href="#how">How it works</a></li>
-          <li><a href="#team">Team</a></li>
-          {user?.role === 'ADMIN' && (
-            <li><Link to="/admin">Admin</Link></li>
-          )}
-        </ul>
-        <div className="nav-right">
-          <UserMenu onSettingsClick={() => setShowSettings(true)} />
-          <a href="#team" className="nav-cta">Explore</a>
-        </div>
-      </nav>
+      
 
       {/* ── Hero ── */}
       <section className="hero">
@@ -245,27 +194,32 @@ export function HomePage() {
             </p>
           </div>
           <div className="dest-grid">
-            {destinations.map(d => (
-              <div key={d.id} className={`dest-card${d.tall ? ' tall' : ''}`}>
-                <div
-                  className="dest-photo"
-                  style={{
-                    backgroundImage: `url(${d.img})`,
-                    backgroundColor: d.fallback,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                  }}
-                >
-                  <span className="dest-badge">{d.badge}</span>
-                  <div className="dest-info">
-                    <div className="dest-name">{d.name}</div>
-                    <div className="dest-country">{d.country}</div>
-                    <div className="dest-stars">{'★'.repeat(d.stars)}{'☆'.repeat(5 - d.stars)}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+  {destinations.map(d => (
+    <div
+      key={d.id}
+      className={`dest-card${d.tall ? ' tall' : ''}`}
+      onClick={() => navigate(`/hotels?destinationId=${d.id}`)}
+      style={{ cursor: 'pointer' }}
+    >
+      <div
+        className="dest-photo"
+        style={{
+          backgroundImage: `url(${d.img})`,
+          backgroundColor: d.fallback,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
+        <span className="dest-badge">{d.badge}</span>
+        <div className="dest-info">
+          <div className="dest-name">{d.name}</div>
+          <div className="dest-country">{d.country}</div>
+          <div className="dest-stars">{'★'.repeat(d.stars)}{'☆'.repeat(5 - d.stars)}</div>
+        </div>
+      </div>
+    </div>
+  ))}
+</div>
         </div>
       </section>
 

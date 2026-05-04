@@ -1,5 +1,6 @@
 package com.skyres.service.impl;
-
+import com.skyres.repository.DestinationRepository;
+import com.skyres.model.entity.Destination;   
 import com.skyres.model.entity.Hotel;
 import com.skyres.repository.HotelRepository;
 import com.skyres.repository.specification.HotelFilterRequest;
@@ -17,26 +18,22 @@ import java.util.List;
 public class HotelServiceImpl implements HotelService {
 
     private final HotelRepository hotelRepository;
+    private final DestinationRepository destinationRepository; 
 
     // ── CRUD ─────────────────────────────────────────────────────────────────
 
     @Override
     @Transactional
     public Hotel create(Hotel hotel) {
+        // Gérer la destination si elle est envoyée (avec un ID)
+        if (hotel.getDestination() != null && hotel.getDestination().getId() != null) {
+            Destination dest = destinationRepository.findById(hotel.getDestination().getId())
+                    .orElseThrow(() -> new EntityNotFoundException("Destination introuvable"));
+            hotel.setDestination(dest);
+        } else {
+            hotel.setDestination(null);
+        }
         return hotelRepository.save(hotel);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Hotel getById(Long id) {
-        return hotelRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Hôtel introuvable : id=" + id));
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<Hotel> getAll() {
-        return hotelRepository.findAll();
     }
 
     @Override
@@ -44,6 +41,7 @@ public class HotelServiceImpl implements HotelService {
     public Hotel update(Long id, Hotel updated) {
         Hotel existing = getById(id);
 
+        // Copie des champs simples
         existing.setName(updated.getName());
         existing.setDescription(updated.getDescription());
         existing.setAddress(updated.getAddress());
@@ -64,7 +62,29 @@ public class HotelServiceImpl implements HotelService {
         existing.setHasFitnessCenter(updated.isHasFitnessCenter());
         existing.setHasBar(updated.isHasBar());
 
+        //  Gestion de la destination 
+        if (updated.getDestination() != null && updated.getDestination().getId() != null) {
+            Destination dest = destinationRepository.findById(updated.getDestination().getId())
+                    .orElseThrow(() -> new EntityNotFoundException("Destination introuvable"));
+            existing.setDestination(dest);
+        } else {
+            existing.setDestination(null);
+        }
+
         return hotelRepository.save(existing);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Hotel getById(Long id) {
+        return hotelRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Hôtel introuvable : id=" + id));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Hotel> getAll() {
+        return hotelRepository.findAll();
     }
 
     @Override

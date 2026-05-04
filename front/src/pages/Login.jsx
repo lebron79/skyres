@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useAuth } from './AuthContext'
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext'
 import './Login.css'
 
 export default function Login() {
@@ -44,6 +45,7 @@ export default function Login() {
     setLoading(true)
     try {
       await login(email, password)
+      navigate('/'); 
     } catch (err) {
       setError(err.message || 'Login failed')
     }
@@ -84,12 +86,13 @@ export default function Login() {
     setLoading(true)
     try {
       await register(firstName.trim(), lastName.trim(), email.trim(), password, phone.trim())
+      navigate('/'); 
     } catch (err) {
       setError(err.message || 'Registration failed')
     }
     setLoading(false)
   }
-
+const navigate = useNavigate();
   return (
     <div className="login-page">
       <div className="login-container">
