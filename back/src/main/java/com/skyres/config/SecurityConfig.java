@@ -37,11 +37,16 @@ public class SecurityConfig {
         "/api/guides/**",
         "/api/activities/**",
         "/api/intelligence/**",
+        "/api/hotels/**",
+        "/api/destinations/**",
+        "/api/reservations/**",
+        "/api/payments/**",
+        "/api/budget/**",
         "/swagger-ui/**",
         "/api-docs/**",
         "/v3/api-docs/**",
         "/swagger-ui.html"
-    };
+};
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {

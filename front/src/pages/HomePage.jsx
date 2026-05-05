@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from './AuthContext'
-import UserMenu from './UserMenu'
+import { useAuth } from '../context/AuthContext'
+import UserMenu from '../components/UserMenu'
 import Settings from './Settings'
-import { apiFetch } from './api'
-import './App.css'
+import { apiFetch } from '../services/api'
+import '../App.css'
 
 const UNS = 'https://images.unsplash.com'
 
@@ -195,8 +195,9 @@ export function HomePage() {
           <li><a href="#activities">Activities</a></li>
           <li><a href="#how">How it works</a></li>
           <li><a href="#team">Team</a></li>
+          <li><Link to="/reservations">My Reservations</Link></li>
           {user?.role === 'ADMIN' && (
-            <li><Link to="/admin">Admin</Link></li>
+          <li><Link to="/admin">Admin</Link></li>
           )}
         </ul>
         <div className="nav-right">

@@ -1,8 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useAuth } from './AuthContext'
-import Login from './Login'
-import { HomePage } from './HomePage'
-import AdminPanel from './AdminPanel'
+import { useAuth } from './context/AuthContext'
+import Login from './pages/Login'
+import { HomePage } from './pages/HomePage'
+import AdminPanel from './pages/AdminPanel'
+import Reservations from './pages/Reservations'
 import './App.css'
 
 export default function App() {
@@ -21,13 +22,11 @@ export default function App() {
       <Routes>
         <Route
           path="/admin"
-          element={
-            !isAuthenticated ? (
-              <Navigate to="/" replace />
-            ) : (
-              <AdminPanel />
-            )
-          }
+          element={!isAuthenticated ? <Navigate to="/" replace /> : <AdminPanel />}
+        />
+        <Route
+          path="/reservations"
+          element={!isAuthenticated ? <Navigate to="/" replace /> : <Reservations />}
         />
         <Route
           path="/"
