@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
-import { destinationAPI } from '../services/destinationAPI'
-import { apiFetch } from '../services/api'
+import { apiFetch, apiFetchPublic } from '../services/api'
 import { humanizeApiError } from '../checkoutUi'
 import '../App.css'
 
@@ -13,31 +12,43 @@ const defaultActivities = [
     id: 1, name: 'Scuba Diving', location: 'Great Barrier Reef', duration: '3h', price: '$85', priceAmount: 85,
     img: `${UNS}/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=700&q=80`,
     fallback: '#01579b',
+    description: 'Dive the world’s largest reef system. Drift past coral gardens, schools of tropical fish, and reef sharks with PADI-certified instructors. All gear and a refresher dive included.',
+    type: 'Diving', season: 'Year-round', minAge: 12,
   },
   {
     id: 2, name: 'Hot Air Balloon', location: 'Cappadocia, Turkey', duration: '2h', price: '$120', priceAmount: 120,
     img: `${UNS}/photo-1507608616759-54f48f0af0ee?auto=format&fit=crop&w=700&q=80`,
     fallback: '#e65100',
+    description: 'Soar above the fairy chimneys at sunrise alongside hundreds of balloons. Includes hotel pickup, light breakfast, certificate, and a champagne toast on landing.',
+    type: 'Aerial', season: 'Apr - Nov', minAge: 6,
   },
   {
     id: 3, name: 'Desert Safari', location: 'Dubai, UAE', duration: '6h', price: '$95', priceAmount: 95,
     img: `${UNS}/photo-1452860606245-08befc0ff44b?auto=format&fit=crop&w=700&q=80`,
     fallback: '#827717',
+    description: 'Dune bashing in a 4x4, sandboarding, camel ride, and a Bedouin-style camp dinner with live tanoura and belly dance shows under the stars.',
+    type: 'Excursion', season: 'Oct - Apr', minAge: 4,
   },
   {
     id: 4, name: 'Northern Lights', location: 'Tromsø, Norway', duration: '4h', price: '$110', priceAmount: 110,
     img: `${UNS}/photo-1531366936337-7c912a4589a7?auto=format&fit=crop&w=700&q=80`,
     fallback: '#1a237e',
+    description: 'Chase the aurora borealis across the Arctic Circle in a heated minibus. Thermal suits, hot drinks, and tripod loans for night photography.',
+    type: 'Astronomy', season: 'Sep - Mar', minAge: 8,
   },
   {
     id: 5, name: 'Mountain Trek', location: 'Nepal Himalayas', duration: '8h', price: '$60', priceAmount: 60,
     img: `${UNS}/photo-1551632811-561732d1e306?auto=format&fit=crop&w=700&q=80`,
     fallback: '#1b5e20',
+    description: 'Day-trek through Himalayan villages and rhododendron forests with panoramic views of Annapurna. Local lunch and English-speaking guide included.',
+    type: 'Hiking', season: 'Mar - May, Sep - Nov', minAge: 14,
   },
   {
     id: 6, name: 'Cooking Class', location: 'Tuscany, Italy', duration: '3h', price: '$75', priceAmount: 75,
     img: `${UNS}/photo-1556909114-f6e7ad7d3136?auto=format&fit=crop&w=700&q=80`,
     fallback: '#880e4f',
+    description: 'Hands-on pasta and tiramisu workshop in a 16th-century farmhouse, paired with two local wines from the family vineyard. Recipe booklet to take home.',
+    type: 'Culinary', season: 'Year-round', minAge: 10,
   },
 ]
 
@@ -64,19 +75,6 @@ const team = [
   },
 ]
 
-const tech = [
-  { icon: '☕', name: 'Spring Boot',     cat: 'Backend'    },
-  { icon: '⚛️', name: 'React',           cat: 'Frontend'   },
-  { icon: '🐬', name: 'MySQL',           cat: 'Database'   },
-  { icon: '🔒', name: 'Spring Security', cat: 'Auth'       },
-  { icon: '🪙', name: 'JWT',             cat: 'Tokens'     },
-  { icon: '📄', name: 'Swagger UI',      cat: 'API Docs'   },
-  { icon: '📑', name: 'iText PDF',       cat: 'Documents'  },
-  { icon: '📧', name: 'Spring Mail',     cat: 'Email'      },
-  { icon: '🗺️', name: 'OpenStreetMap',   cat: 'Maps'       },
-  { icon: '🤖', name: 'AI Engine',       cat: 'Smart Recs' },
-]
-
 const pills = ['🌴 Bali', '🗼 Paris', '🗾 Tokyo', '🏔️ Alps', '🏜️ Marrakech', '🌊 Maldives']
 
 const steps = [
@@ -90,6 +88,30 @@ const heroCards = [
   { cls: 'fc-2', img: `${UNS}/photo-1570077188670-e3a8d69ac5ff?auto=format&fit=crop&w=300&q=70`, label: 'Santorini, Greece'  },
   { cls: 'fc-3', img: `${UNS}/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=300&q=70`, label: 'Tokyo, Japan'       },
 ]
+
+const DEST_FALLBACK_COLORS = ['#1a5276', '#7d6608', '#7b241c', '#154360', '#6e2f1a', '#1d4e1d', '#0e6655', '#4a235a']
+
+function mapDestinationForHome(dest, idx) {
+  const starsRaw = dest.averageRating != null ? Number(dest.averageRating) : 5
+  const stars = Number.isFinite(starsRaw)
+    ? Math.min(5, Math.max(1, Math.round(starsRaw)))
+    : 5
+  const city = (dest.city || '').trim()
+  const country = (dest.country || '').trim()
+  return {
+    id: dest.id,
+    name: city || country || 'Destination',
+    country: country || city || '',
+    img:
+      dest.imageUrl ||
+      `${UNS}/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=800&q=80`,
+    fallback: DEST_FALLBACK_COLORS[idx % DEST_FALLBACK_COLORS.length],
+    badge: dest.trending ? 'Trending' : (dest.climate || 'Explore'),
+    stars,
+    tall: !!dest.trending,
+    raw: dest,
+  }
+}
 
 const guideTopColors = ['#0C7A6E', '#1565c0', '#6a1b9a', '#b45309', '#0d9488', '#1e40af']
 
@@ -113,25 +135,59 @@ export function HomePage() {
   const [storySaving, setStorySaving] = useState(false)
   const [storyMessage, setStoryMessage] = useState(null)
   const [storyError, setStoryError] = useState(null)
+  const [searchActiveTerm, setSearchActiveTerm] = useState('')
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [detailModal, setDetailModal] = useState(null)
+  const [myBookings, setMyBookings] = useState([])
+  const [bookingsLoading, setBookingsLoading] = useState(false)
 
-  useEffect(() => {
-    const fetchDestinations = async () => {
-      try {
-        const api = destinationAPI(token)
-        const data = await api.getAll()
-        setDestinations(data || [])
-      } catch (err) {
-        console.error(err)
-      }
+  const loadDestinations = useCallback(async (keyword) => {
+    setSearchLoading(true)
+    try {
+      const path = keyword
+        ? `/api/destinations/search?keyword=${encodeURIComponent(keyword)}`
+        : '/api/destinations'
+      const data = await apiFetchPublic(path, { method: 'GET' })
+      const list = Array.isArray(data) ? data : []
+      setDestinations(list.map((d, i) => mapDestinationForHome(d, i)))
+    } catch (err) {
+      console.error(err)
+      setDestinations([])
+    } finally {
+      setSearchLoading(false)
     }
-    fetchDestinations()
-  }, [token])
+  }, [])
+
+  useEffect(() => { loadDestinations('') }, [loadDestinations])
+
+  const runSearch = (rawTerm) => {
+    const term = (rawTerm ?? '').trim()
+    setSearch(term)
+    setSearchActiveTerm(term)
+    loadDestinations(term)
+    if (term) {
+      setTimeout(() => {
+        document.getElementById('destinations')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 60)
+    }
+  }
+
+  const onHeroSearchSubmit = (e) => {
+    e.preventDefault()
+    runSearch(search)
+  }
+
+  const clearSearch = () => {
+    setSearch('')
+    setSearchActiveTerm('')
+    loadDestinations('')
+  }
 
   useEffect(() => {
     const loadActivities = async () => {
       setActivitiesLoading(true)
       try {
-        const data = await apiFetch('/api/activities', { method: 'GET' })
+        const data = await apiFetchPublic('/api/activities', { method: 'GET' })
         if (Array.isArray(data) && data.length > 0) {
           const mapped = data.map((a, idx) => ({
             id: a.id ?? `db-${idx}`,
@@ -144,6 +200,16 @@ export function HomePage() {
             priceAmount: typeof a.price === 'number' ? a.price : null,
             img: a.imageUrl || defaultActivities[idx % defaultActivities.length].img,
             fallback: defaultActivities[idx % defaultActivities.length].fallback,
+            description:
+              a.description ||
+              defaultActivities[idx % defaultActivities.length].description,
+            type: a.type || defaultActivities[idx % defaultActivities.length].type,
+            season: a.season || defaultActivities[idx % defaultActivities.length].season,
+            minAge:
+              typeof a.minAge === 'number'
+                ? a.minAge
+                : defaultActivities[idx % defaultActivities.length].minAge,
+            raw: a,
           }))
           setActivities(mapped)
         }
@@ -160,7 +226,7 @@ export function HomePage() {
     const loadGuides = async () => {
       setGuidesLoading(true)
       try {
-        const data = await apiFetch('/api/guides', { method: 'GET' })
+        const data = await apiFetchPublic('/api/guides', { method: 'GET' })
         setGuides(Array.isArray(data) ? data : [])
       } catch {
         setGuides([])
@@ -171,11 +237,20 @@ export function HomePage() {
     loadGuides()
   }, [])
 
+
+  useEffect(() => {
+    if (!isAuthenticated || !token || user?.role !== 'TOURIST') return
+    setBookingsLoading(true)
+    apiFetch('/api/reservations', { method: 'GET' }, token)
+      .then(data => setMyBookings(Array.isArray(data) ? data : []))
+      .catch(() => setMyBookings([]))
+      .finally(() => setBookingsLoading(false))
+  }, [isAuthenticated, token, user])
   useEffect(() => {
     const loadStories = async () => {
       setStoriesLoading(true)
       try {
-        const data = await apiFetch('/api/stories', { method: 'GET' })
+        const data = await apiFetchPublic('/api/stories', { method: 'GET' })
         setStories(Array.isArray(data) ? data : [])
       } catch {
         setStories([])
@@ -226,7 +301,7 @@ export function HomePage() {
       )
       setStoryMessage('Thanks — your story is live!')
       setStoryForm((f) => ({ ...f, storyText: '' }))
-      const data = await apiFetch('/api/stories', { method: 'GET' })
+      const data = await apiFetchPublic('/api/stories', { method: 'GET' })
       setStories(Array.isArray(data) ? data : [])
     } catch (err) {
       setStoryError(humanizeApiError(err.message || 'Could not save your story.'))
@@ -277,6 +352,69 @@ export function HomePage() {
     navigate(url)
   }
 
+  const openDestinationDetails = (d) => {
+    const raw = d.raw || {}
+    setDetailModal({
+      kind: 'destination',
+      title: `${d.name}${d.country ? `, ${d.country}` : ''}`,
+      subtitle: raw.climate ? `${raw.climate} climate` : 'Destination details',
+      description:
+        raw.description ||
+        'Explore hotels, activities, and local experiences in this destination.',
+      tags: [
+        raw.estimatedBudget != null ? `Budget: $${raw.estimatedBudget}` : null,
+        raw.averageRating != null ? `Rating: ${Number(raw.averageRating).toFixed(1)}/5` : null,
+        raw.trending ? 'Trending destination' : null,
+      ].filter(Boolean),
+      primaryLabel: 'View hotels',
+      onPrimary: () => navigate(`/hotels?destinationId=${d.id}`),
+    })
+  }
+
+  const openActivityDetails = (a) => {
+    setDetailModal({
+      kind: 'activity',
+      title: a.name,
+      subtitle: a.location,
+      description: a.description || 'No activity description available yet.',
+      tags: [
+        a.type ? `Type: ${a.type}` : null,
+        a.season ? `Best season: ${a.season}` : null,
+        a.minAge != null ? `Min age: ${a.minAge}+` : null,
+        a.duration ? `Duration: ${a.duration}` : null,
+        a.price ? `Price: ${a.price}` : null,
+      ].filter(Boolean),
+      primaryLabel: 'Book experience',
+      onPrimary: () => goToActivityPayment(a),
+    })
+  }
+
+  const openGuideDetails = (g) => {
+    const first = g.user?.firstName ?? ''
+    const last = g.user?.lastName ?? ''
+    const displayName = `${first} ${last}`.trim() || `Guide #${g.id}`
+    const rate =
+      g.hourlyRate != null && Number.isFinite(Number(g.hourlyRate))
+        ? `$${g.hourlyRate}/hr`
+        : 'Rate on request'
+    setDetailModal({
+      kind: 'guide',
+      title: displayName,
+      subtitle: g.region || 'Guide profile',
+      description:
+        g.user?.bio ||
+        'Professional local guide ready to help you discover the destination.',
+      tags: [
+        g.languages ? `Languages: ${g.languages}` : null,
+        `Rate: ${rate}`,
+        g.averageRating != null ? `Rating: ${Number(g.averageRating).toFixed(1)}/5` : null,
+        g.available ? 'Available now' : 'Currently unavailable',
+      ].filter(Boolean),
+      primaryLabel: g.available ? 'Book session' : null,
+      onPrimary: g.available ? () => goToGuidePayment(g) : null,
+    })
+  }
+
   return (
     <div>
 
@@ -302,7 +440,7 @@ export function HomePage() {
           recommendations — all in one platform built for modern explorers.
         </p>
 
-        <div className="search-bar">
+        <form className="search-bar" onSubmit={onHeroSearchSubmit}>
           <div className="search-field">
             <label>Where to?</label>
             <input
@@ -319,17 +457,29 @@ export function HomePage() {
             <label>Guests</label>
             <span>Add guests</span>
           </div>
-          <button className="search-btn">
+          <button type="submit" className="search-btn" disabled={searchLoading}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
-            Search
+            {searchLoading ? 'Searching…' : 'Search'}
           </button>
-        </div>
+        </form>
 
         <div className="hero-tags">
           <strong>Popular:</strong>
-          {pills.map(p => <button key={p} className="dest-pill">{p}</button>)}
+          {pills.map(p => {
+            const term = p.replace(/^\S+\s*/, '').trim()
+            return (
+              <button
+                key={p}
+                type="button"
+                className="dest-pill"
+                onClick={() => runSearch(term)}
+              >
+                {p}
+              </button>
+            )
+          })}
         </div>
 
         <div className="hero-stats">
@@ -340,24 +490,96 @@ export function HomePage() {
         </div>
       </section>
 
+
+      {/* ── My Bookings (tourist only) ── */}
+      {isAuthenticated && user?.role === 'TOURIST' && (
+        <section className="section" style={{ paddingTop: '2rem', paddingBottom: '2rem' }}>
+          <div className="container">
+            <div className="section-header">
+              <div className="section-label">Your account</div>
+              <h2 className="section-heading">My bookings</h2>
+            </div>
+            {bookingsLoading && <p className="guides-status">Loading your bookings…</p>}
+            {!bookingsLoading && myBookings.length === 0 && (
+              <p className="guides-status">You have no bookings yet. Explore destinations below!</p>
+            )}
+            {!bookingsLoading && myBookings.length > 0 && (
+              <div className="bookings-grid">
+                {myBookings.map(b => {
+                  const statusColor = {
+                    CONFIRMED: '#0d9488', PENDING: '#b45309', CANCELLED: '#dc2626',
+                  }[b.status] || '#6b7280'
+                  const nights = b.checkIn && b.checkOut
+                    ? Math.max(1, Math.round((new Date(b.checkOut) - new Date(b.checkIn)) / 86400000))
+                    : null
+                  return (
+                    <div key={b.id} className="booking-card">
+                      <div className="booking-header">
+                        <div>
+                          <div className="booking-hotel">{b.hotel?.name ?? 'Hotel'}</div>
+                          <div className="booking-dest">{b.hotel?.destination?.city ?? ''}{b.hotel?.destination?.city && b.hotel?.destination?.country ? ', ' : ''}{b.hotel?.destination?.country ?? ''}</div>
+                        </div>
+                        <span className="booking-status" style={{ background: statusColor }}>{b.status}</span>
+                      </div>
+                      <div className="booking-dates">
+                        {b.checkIn && <span>Check-in: <strong>{new Date(b.checkIn).toLocaleDateString()}</strong></span>}
+                        {b.checkOut && <span>Check-out: <strong>{new Date(b.checkOut).toLocaleDateString()}</strong></span>}
+                        {nights && <span>{nights} night{nights > 1 ? 's' : ''}</span>}
+                      </div>
+                      {b.totalPrice != null && (
+                        <div className="booking-price">Total: <strong>${Number(b.totalPrice).toFixed(2)}</strong></div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            <div style={{ marginTop: '1rem' }}>
+              <button type="button" className="search-btn" style={{ fontSize: '0.85rem', padding: '8px 18px' }}
+                onClick={() => navigate('/reservations')}>
+                Manage all reservations →
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
       {/* ── Destinations ── */}
       <section id="destinations" className="section alt">
         <div className="container">
           <div className="section-header">
             <div className="section-label">Explore</div>
-            <h2 className="section-heading">Popular destinations</h2>
+            <h2 className="section-heading">
+              {searchActiveTerm ? `Results for “${searchActiveTerm}”` : 'Popular destinations'}
+            </h2>
             <p className="section-body">
-              Hand-picked destinations loved by thousands of travellers,
-              from tropical beaches to alpine adventures.
+              {searchActiveTerm
+                ? `${destinations.length} destination${destinations.length === 1 ? '' : 's'} matched your search.`
+                : 'Hand-picked destinations loved by thousands of travellers, from tropical beaches to alpine adventures.'}
             </p>
+            {searchActiveTerm && (
+              <button
+                type="button"
+                className="dest-pill"
+                onClick={clearSearch}
+                style={{ marginTop: 12 }}
+              >
+                ✕ Clear search
+              </button>
+            )}
           </div>
+          {searchLoading && <p className="guides-status">Searching destinations…</p>}
+          {!searchLoading && destinations.length === 0 && searchActiveTerm && (
+            <p className="guides-status">
+              No destinations match “{searchActiveTerm}”. Try another country, city, or keyword.
+            </p>
+          )}
           <div className="dest-grid">
   {destinations.map(d => (
-    <div
+    <button
       key={d.id}
       className={`dest-card${d.tall ? ' tall' : ''}`}
-      onClick={() => navigate(`/hotels?destinationId=${d.id}`)}
-      style={{ cursor: 'pointer' }}
+      onClick={() => openDestinationDetails(d)}
+      type="button"
     >
       <div
         className="dest-photo"
@@ -375,7 +597,7 @@ export function HomePage() {
           <div className="dest-stars">{'★'.repeat(d.stars)}{'☆'.repeat(5 - d.stars)}</div>
         </div>
       </div>
-    </div>
+    </button>
   ))}
 </div>
         </div>
@@ -415,7 +637,12 @@ export function HomePage() {
                     : null
                 const topColor = guideTopColors[idx % guideTopColors.length]
                 return (
-                  <div key={g.id} className={`guide-card${g.available ? '' : ' guide-card-unavailable'}`}>
+                  <button
+                    key={g.id}
+                    className={`guide-card${g.available ? '' : ' guide-card-unavailable'}`}
+                    type="button"
+                    onClick={() => openGuideDetails(g)}
+                  >
                     <div
                       className="guide-card-top"
                       style={{
@@ -443,12 +670,15 @@ export function HomePage() {
                         type="button"
                         className="guide-btn"
                         disabled={!g.available}
-                        onClick={() => goToGuidePayment(g)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          goToGuidePayment(g)
+                        }}
                       >
                         Book session
                       </button>
                     </div>
-                  </div>
+                  </button>
                 )
               })}
           </div>
@@ -471,7 +701,11 @@ export function HomePage() {
           <div className="act-grid">
             {activitiesLoading && <p className="guides-status">Loading activities...</p>}
             {activities.map(a => (
-              <div key={a.id} className="act-card">
+              <article
+                key={a.id}
+                className="act-card"
+                onClick={() => openActivityDetails(a)}
+              >
                 <div
                   className="act-photo"
                   style={{
@@ -492,12 +726,15 @@ export function HomePage() {
                   <button
                     type="button"
                     className="act-btn"
-                    onClick={() => goToActivityPayment(a)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      goToActivityPayment(a)
+                    }}
                   >
                     Book experience
                   </button>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
         </div>
@@ -758,43 +995,6 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* ── Tech Stack ── */}
-      <section id="tech" className="section alt">
-        <div className="container">
-          <div className="section-header">
-            <div className="section-label">Technology</div>
-            <h2 className="section-heading">Built on a solid stack</h2>
-            <p className="section-body">
-              Industry-standard tools chosen for reliability and learning value.
-              Spring Boot on port 8080, React on 5173 — two terminals and you're running.
-            </p>
-          </div>
-          <div className="tech-pills">
-            {tech.map(t => (
-              <div key={t.name} className="tech-pill">
-                <span className="tech-pill-icon">{t.icon}</span>
-                <div>
-                  <div className="tech-pill-name">{t.name}</div>
-                  <div className="tech-pill-cat">{t.cat}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── CTA ── */}
-      <section className="cta-section">
-        <div className="container">
-          <h2>Ready to start building?</h2>
-          <p>Push to GitHub, each person picks their branch, and the platform comes to life.</p>
-          <div className="cta-btns">
-            <a href="https://github.com" target="_blank" rel="noreferrer" className="btn-white">Clone on GitHub →</a>
-            <a href="#team" className="btn-ghost">View team modules</a>
-          </div>
-        </div>
-      </section>
-
       {/* ── Footer ── */}
       <footer className="footer">
         <div className="footer-logo">
@@ -808,10 +1008,58 @@ export function HomePage() {
           <li><a href="#how">How it works</a></li>
           <li><a href="#reviews">Stories</a></li>
           <li><a href="#team">Team</a></li>
-          <li><a href="#tech">Stack</a></li>
         </ul>
         <span className="footer-copy">Smart Tourism Platform — Spring Boot · React · MySQL</span>
       </footer>
+
+      {detailModal && (
+        <div className="details-modal-backdrop" role="presentation" onClick={() => setDetailModal(null)}>
+          <div
+            className="details-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={detailModal.title}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="details-modal-close"
+              onClick={() => setDetailModal(null)}
+              aria-label="Close details"
+            >
+              ✕
+            </button>
+            <p className="details-modal-kicker">{detailModal.kind}</p>
+            <h3 className="details-modal-title">{detailModal.title}</h3>
+            {detailModal.subtitle && <p className="details-modal-subtitle">{detailModal.subtitle}</p>}
+            <p className="details-modal-description">{detailModal.description}</p>
+            {detailModal.tags?.length > 0 && (
+              <div className="details-modal-tags">
+                {detailModal.tags.map((tag) => (
+                  <span key={tag} className="details-modal-tag">{tag}</span>
+                ))}
+              </div>
+            )}
+            <div className="details-modal-actions">
+              <button type="button" className="dest-pill" onClick={() => setDetailModal(null)}>
+                Close
+              </button>
+              {detailModal.primaryLabel && detailModal.onPrimary && (
+                <button
+                  type="button"
+                  className="act-btn"
+                  onClick={() => {
+                    detailModal.onPrimary()
+                    setDetailModal(null)
+                  }}
+                >
+                  {detailModal.primaryLabel}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -4,6 +4,62 @@ import { useAuth } from '../context/AuthContext'
 import { apiFetch } from '../services/api'
 import './AdminPanel.css'
 
+function RoleBadge({ role }) {
+  const map = {
+    ADMIN:   { cls: 'admin-badge-purple', label: '⚙ Admin' },
+    GUIDE:   { cls: 'admin-badge-teal',   label: '🧭 Guide' },
+    TOURIST: { cls: 'admin-badge-blue',   label: '✈ Tourist' },
+  }
+  const { cls, label } = map[role] ?? { cls: 'admin-badge-gray', label: role }
+  return <span className={`admin-badge ${cls}`}>{label}</span>
+}
+
+function BoolBadge({ value, trueLabel = 'Yes', falseLabel = 'No' }) {
+  return value
+    ? <span className="admin-badge admin-badge-green">✓ {trueLabel}</span>
+    : <span className="admin-badge admin-badge-gray">✗ {falseLabel}</span>
+}
+
+function PayStatusBadge({ status }) {
+  const map = {
+    PAID:    'admin-badge-green',
+    PENDING: 'admin-badge-amber',
+    FAILED:  'admin-badge-red',
+    REFUNDED:'admin-badge-gray',
+  }
+  const s = (status ?? '').toUpperCase()
+  return <span className={`admin-badge ${map[s] ?? 'admin-badge-gray'}`}>{status ?? '—'}</span>
+}
+
+function UserCell({ firstName, lastName, email }) {
+  const initials = `${(firstName?.[0] ?? '').toUpperCase()}${(lastName?.[0] ?? '').toUpperCase()}`
+  return (
+    <div className="admin-user-cell">
+      <div className="admin-user-cell-avatar">{initials || '?'}</div>
+      <div>
+        <div className="admin-user-cell-name">{firstName} {lastName}</div>
+        {email && <div className="admin-user-cell-sub">{email}</div>}
+      </div>
+    </div>
+  )
+}
+
+function EditBtn({ onClick }) {
+  return (
+    <button type="button" className="admin-action-btn admin-action-btn-edit" onClick={onClick}>
+      ✏ Edit
+    </button>
+  )
+}
+
+function DeleteBtn({ onClick }) {
+  return (
+    <button type="button" className="admin-action-btn admin-action-btn-delete" onClick={onClick}>
+      🗑 Delete
+    </button>
+  )
+}
+
 const ACTIVITY_PRESETS = [
   'Desert safari',
   'Scuba diving',
@@ -34,11 +90,16 @@ export default function AdminPanel() {
   const [tab, setTab] = useState('guides')
   const [guides, setGuides] = useState([])
   const [activities, setActivities] = useState([])
+  const [destinations, setDestinations] = useState([])
   const [users, setUsers] = useState([])
+  const [payments, setPayments] = useState([])
+  const [reservations, setReservations] = useState([])
   const [loading, setLoading] = useState(false)
+  const [seedLoading, setSeedLoading] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
   const [templatePick, setTemplatePick] = useState('')
   const [error, setError] = useState(null)
+  const [success, setSuccess] = useState(null)
   const [guideForm, setGuideForm] = useState({
     id: null,
     userId: '',
@@ -58,6 +119,17 @@ export default function AdminPanel() {
     imageUrl: '',
     destinationId: '',
   })
+  const [destinationForm, setDestinationForm] = useState({
+    id: null,
+    country: '',
+    city: '',
+    description: '',
+    imageUrl: '',
+    climate: '',
+    estimatedBudget: '',
+    averageRating: '',
+    trending: false,
+  })
   const [userForm, setUserForm] = useState({
     id: null,
     firstName: '',
@@ -69,6 +141,11 @@ export default function AdminPanel() {
     photoUrl: '',
     bio: '',
   })
+
+  const showSuccess = useCallback((msg) => {
+    setSuccess(msg)
+    setTimeout(() => setSuccess(null), 3000)
+  }, [])
 
   const loadGuides = useCallback(async () => {
     setLoading(true)
@@ -109,11 +186,51 @@ export default function AdminPanel() {
     }
   }, [token])
 
+  const loadDestinations = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await apiFetch('/api/destinations', { method: 'GET' }, token)
+      setDestinations(Array.isArray(data) ? data : [])
+    } catch (e) {
+      setError(e.message || 'Failed to load destinations')
+    } finally {
+      setLoading(false)
+    }
+  }, [token])
+
+  const loadBilling = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [paymentsData, reservationsData] = await Promise.all([
+        apiFetch('/api/admin/payments', { method: 'GET' }, token),
+        apiFetch('/api/admin/reservations', { method: 'GET' }, token),
+      ])
+      setPayments(Array.isArray(paymentsData) ? paymentsData : [])
+      setReservations(Array.isArray(reservationsData) ? reservationsData : [])
+    } catch (e) {
+      const status = Number(e?.status)
+      if (status === 403) {
+        setError('Forbidden: billing data is only available for ADMIN accounts.')
+      } else {
+        setError(e.message || 'Failed to load billing data')
+      }
+      setPayments([])
+      setReservations([])
+    } finally {
+      setLoading(false)
+    }
+  }, [token])
+
   useEffect(() => {
+    if (user?.role !== 'ADMIN') return
     if (tab === 'guides') loadGuides()
     else if (tab === 'activities') loadActivities()
-    else loadUsers()
-  }, [tab, loadGuides, loadActivities, loadUsers])
+    else if (tab === 'destinations') loadDestinations()
+    else if (tab === 'users') loadUsers()
+    else loadBilling()
+  }, [tab, user?.role, loadGuides, loadActivities, loadDestinations, loadUsers, loadBilling])
 
   useEffect(() => {
     refreshUser()
@@ -146,6 +263,19 @@ export default function AdminPanel() {
       phone: '',
       photoUrl: '',
       bio: '',
+    })
+
+  const resetDestinationForm = () =>
+    setDestinationForm({
+      id: null,
+      country: '',
+      city: '',
+      description: '',
+      imageUrl: '',
+      climate: '',
+      estimatedBudget: '',
+      averageRating: '',
+      trending: false,
     })
 
   const fillActivityWithGroq = async () => {
@@ -200,6 +330,7 @@ export default function AdminPanel() {
         await apiFetch('/api/guides', { method: 'POST', body: JSON.stringify(body) }, token)
       }
       resetGuideForm()
+      showSuccess(guideForm.id ? 'Guide updated successfully.' : 'Guide created successfully.')
       await loadGuides()
     } catch (err) {
       setError(err.message || 'Save failed')
@@ -212,6 +343,7 @@ export default function AdminPanel() {
     try {
       await apiFetch(`/api/guides/${id}`, { method: 'DELETE' }, token)
       if (guideForm.id === id) resetGuideForm()
+      showSuccess('Guide deleted.')
       await loadGuides()
     } catch (err) {
       setError(err.message || 'Delete failed')
@@ -255,6 +387,7 @@ export default function AdminPanel() {
         await apiFetch('/api/activities', { method: 'POST', body: JSON.stringify(body) }, token)
       }
       resetActivityForm()
+      showSuccess(activityForm.id ? 'Activity updated.' : 'Activity created.')
       await loadActivities()
     } catch (err) {
       setError(err.message || 'Save failed')
@@ -267,6 +400,7 @@ export default function AdminPanel() {
     try {
       await apiFetch(`/api/activities/${id}`, { method: 'DELETE' }, token)
       if (activityForm.id === id) resetActivityForm()
+      showSuccess('Activity deleted.')
       await loadActivities()
     } catch (err) {
       setError(err.message || 'Delete failed')
@@ -316,9 +450,86 @@ export default function AdminPanel() {
         await apiFetch('/api/admin/users', { method: 'POST', body: JSON.stringify(body) }, token)
       }
       resetUserForm()
+      showSuccess(userForm.id ? 'User updated.' : 'User created.')
       await loadUsers()
     } catch (err) {
       setError(err.message || 'Save failed')
+    }
+  }
+
+  const saveDestination = async (e) => {
+    e.preventDefault()
+    setError(null)
+    const body = {
+      country: destinationForm.country.trim(),
+      city: destinationForm.city.trim(),
+      description: destinationForm.description.trim() || null,
+      imageUrl: destinationForm.imageUrl.trim() || null,
+      climate: destinationForm.climate.trim() || null,
+      estimatedBudget:
+        destinationForm.estimatedBudget === '' ? null : Number(destinationForm.estimatedBudget),
+      averageRating:
+        destinationForm.averageRating === '' ? null : Number(destinationForm.averageRating),
+      trending: destinationForm.trending,
+    }
+    if (!body.country || !body.city) {
+      setError('Country and city are required for a destination.')
+      return
+    }
+    try {
+      if (destinationForm.id) {
+        await apiFetch(`/api/destinations/${destinationForm.id}`, { method: 'PUT', body: JSON.stringify(body) }, token)
+      } else {
+        await apiFetch('/api/destinations', { method: 'POST', body: JSON.stringify(body) }, token)
+      }
+      resetDestinationForm()
+      showSuccess(destinationForm.id ? 'Destination updated.' : 'Destination created.')
+      await loadDestinations()
+    } catch (err) {
+      setError(err.message || 'Save failed')
+    }
+  }
+
+  const editDestination = (d) => {
+    setDestinationForm({
+      id: d.id,
+      country: d.country ?? '',
+      city: d.city ?? '',
+      description: d.description ?? '',
+      imageUrl: d.imageUrl ?? '',
+      climate: d.climate ?? '',
+      estimatedBudget: d.estimatedBudget ?? '',
+      averageRating: d.averageRating ?? '',
+      trending: !!d.trending,
+    })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const deleteDestination = async (id) => {
+    if (!window.confirm('Delete this destination?')) return
+    setError(null)
+    try {
+      await apiFetch(`/api/destinations/${id}`, { method: 'DELETE' }, token)
+      if (destinationForm.id === id) resetDestinationForm()
+      showSuccess('Destination deleted.')
+      await loadDestinations()
+    } catch (err) {
+      setError(err.message || 'Delete failed')
+    }
+  }
+
+  const seedCatalogNow = async () => {
+    setSeedLoading(true)
+    setError(null)
+    try {
+      await apiFetch('/api/admin/seed-catalog', { method: 'POST' }, token)
+      if (tab === 'destinations') {
+        await Promise.all([loadDestinations(), loadActivities(), loadGuides()])
+      }
+    } catch (err) {
+      setError(err.message || 'Could not seed catalog')
+    } finally {
+      setSeedLoading(false)
     }
   }
 
@@ -343,6 +554,7 @@ export default function AdminPanel() {
     try {
       await apiFetch(`/api/admin/users/${id}`, { method: 'DELETE' }, token)
       if (userForm.id === id) resetUserForm()
+      showSuccess('User deleted.')
       await loadUsers()
     } catch (err) {
       setError(err.message || 'Delete failed')
@@ -353,47 +565,97 @@ export default function AdminPanel() {
     return <AccessDenied />
   }
 
+  const tabCounts = {
+    guides: guides.length,
+    activities: activities.length,
+    destinations: destinations.length,
+    users: users.length,
+    billing: payments.length,
+  }
+
+  const tabMeta = {
+    guides:       { label: 'Guide profiles',            sub: 'Link platform users to certified guides.' },
+    activities:   { label: 'Activities catalogue',       sub: 'Create experiences — use Groq AI to fill metadata from the activity name.' },
+    destinations: { label: 'Destination management',    sub: 'Create and maintain destination cards used across search and activities.' },
+    users:        { label: 'User management',           sub: 'Create, edit profiles/roles, and delete platform users.' },
+    billing:      { label: 'Payments & Reservations',   sub: 'Track paid users, payment status, and reservation records.' },
+  }
+
   return (
     <div className="admin-root">
       <aside className="admin-sidebar-nav">
-        <Link to="/" className="admin-sidebar-logo">✈ SkyRes</Link>
-        <p className="admin-sidebar-label">Console</p>
+        <div className="admin-sidebar-header">
+          <Link to="/" className="admin-sidebar-logo">
+            <span className="admin-logo-mark">✈</span>
+            SkyRes
+          </Link>
+          <p className="admin-sidebar-subtitle">Admin Console</p>
+        </div>
+
+        <p className="admin-sidebar-label">Navigation</p>
         <nav className="admin-sidebar-tabs">
-          <button type="button" className={tab === 'guides' ? 'active' : ''} onClick={() => setTab('guides')}>
-            <span className="admin-tab-icon">👤</span>
-            Guides
-          </button>
-          <button type="button" className={tab === 'activities' ? 'active' : ''} onClick={() => setTab('activities')}>
-            <span className="admin-tab-icon">🎯</span>
-            Activities
-          </button>
-          <button type="button" className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>
-            <span className="admin-tab-icon">🧑</span>
-            Users
-          </button>
+          {[
+            { key: 'guides',       icon: '🧭', label: 'Guides' },
+            { key: 'activities',   icon: '🎯', label: 'Activities' },
+            { key: 'destinations', icon: '🌍', label: 'Destinations' },
+            { key: 'users',        icon: '👥', label: 'Users' },
+            { key: 'billing',      icon: '💳', label: 'Billing' },
+          ].map(({ key, icon, label }) => (
+            <button
+              key={key}
+              type="button"
+              className={tab === key ? 'active' : ''}
+              onClick={() => setTab(key)}
+            >
+              <span className="admin-tab-icon">{icon}</span>
+              {label}
+              {tabCounts[key] > 0 && (
+                <span className="admin-tab-count">{tabCounts[key]}</span>
+              )}
+            </button>
+          ))}
         </nav>
-        <p className="admin-sidebar-foot">Signed in as<br /><strong>{user?.email}</strong></p>
+
+        <div className="admin-sidebar-foot">
+          <div className="admin-sidebar-user">
+            <div className="admin-user-avatar">
+              {(user?.email?.[0] ?? 'A').toUpperCase()}
+            </div>
+            <div className="admin-user-info">
+              <div className="admin-user-label">Signed in as</div>
+              <div className="admin-user-email">{user?.email}</div>
+            </div>
+          </div>
+        </div>
       </aside>
 
       <main className="admin-main">
         <header className="admin-page-head">
-          <h1>
-            {tab === 'guides'
-              ? 'Guide profiles'
-              : tab === 'activities'
-                ? 'Activities catalogue'
-                : 'User management'}
-          </h1>
-          <p className="admin-page-sub">
-            {tab === 'guides'
-              ? 'Link platform users to certified guides.'
-              : tab === 'activities'
-                ? 'Create experiences — use Groq AI to fill metadata from the activity name.'
-                : 'Create, edit roles, and delete platform users.'}
-          </p>
+          <div className="admin-page-head-row">
+            <h1>
+              {tabMeta[tab].label}
+              {tabCounts[tab] > 0 && (
+                <span className="admin-record-count">{tabCounts[tab]} records</span>
+              )}
+            </h1>
+            <div className="admin-page-actions">
+              {(tab === 'destinations' || tab === 'activities' || tab === 'guides') && (
+                <button
+                  type="button"
+                  className="admin-btn admin-btn-ghost"
+                  onClick={seedCatalogNow}
+                  disabled={seedLoading}
+                >
+                  {seedLoading ? <><span className="admin-spinner" /> Seeding…</> : '🌱 Seed sample data'}
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="admin-page-sub">{tabMeta[tab].sub}</p>
         </header>
 
         {error && <div className="admin-alert">{error}</div>}
+        {success && <div className="admin-success">{success}</div>}
 
       {tab === 'guides' && (
         <div className="admin-grid">
@@ -459,7 +721,9 @@ export default function AdminPanel() {
           <section className="admin-card admin-card--table admin-card--glass">
             <div className="admin-card-head">
               <h2>All guides</h2>
-              <button type="button" className="admin-btn admin-btn-ghost" onClick={loadGuides} disabled={loading}>Refresh</button>
+              <button type="button" className="admin-btn admin-btn-ghost" onClick={loadGuides} disabled={loading}>
+                {loading ? <span className="admin-spinner" /> : '↻'} Refresh
+              </button>
             </div>
             <div className="admin-table-wrap">
               <table className="admin-table">
@@ -478,28 +742,33 @@ export default function AdminPanel() {
                 <tbody>
                   {guides.map((g) => (
                     <tr key={g.id}>
-                      <td>{g.id}</td>
+                      <td style={{ color: 'var(--text-3)', fontWeight: 600 }}>#{g.id}</td>
                       <td>
-                        {g.user ? (
-                          <span>{g.user.firstName} {g.user.lastName} <span className="admin-muted">({g.user.email})</span></span>
-                        ) : (
-                          '—'
-                        )}
+                        {g.user
+                          ? <UserCell firstName={g.user.firstName} lastName={g.user.lastName} email={g.user.email} />
+                          : <span className="admin-muted">—</span>}
                       </td>
-                      <td>{g.languages ?? '—'}</td>
-                      <td>{g.hourlyRate ?? '—'}</td>
-                      <td>{g.region ?? '—'}</td>
-                      <td>{g.available ? 'Yes' : 'No'}</td>
-                      <td>{g.averageRating != null ? g.averageRating.toFixed(1) : '—'}</td>
-                      <td className="admin-actions">
-                        <button type="button" className="admin-link" onClick={() => editGuide(g)}>Edit</button>
-                        <button type="button" className="admin-link danger" onClick={() => deleteGuide(g.id)}>Delete</button>
+                      <td>{g.languages ?? <span className="admin-muted">—</span>}</td>
+                      <td>{g.hourlyRate != null ? `$${g.hourlyRate}/h` : <span className="admin-muted">—</span>}</td>
+                      <td>{g.region ?? <span className="admin-muted">—</span>}</td>
+                      <td><BoolBadge value={g.available} trueLabel="Available" falseLabel="Unavailable" /></td>
+                      <td>{g.averageRating != null ? `⭐ ${g.averageRating.toFixed(1)}` : <span className="admin-muted">—</span>}</td>
+                      <td>
+                        <div className="admin-actions">
+                          <EditBtn onClick={() => editGuide(g)} />
+                          <DeleteBtn onClick={() => deleteGuide(g.id)} />
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {!loading && guides.length === 0 && <p className="admin-empty">No guides yet.</p>}
+              {!loading && guides.length === 0 && (
+                <div className="admin-empty">
+                  <span className="admin-empty-icon">🧭</span>
+                  No guides yet. Create one using the form.
+                </div>
+              )}
             </div>
           </section>
         </div>
@@ -638,7 +907,9 @@ export default function AdminPanel() {
           <section className="admin-card admin-card--table admin-card--glass">
             <div className="admin-card-head">
               <h2>All activities</h2>
-              <button type="button" className="admin-btn admin-btn-ghost" onClick={loadActivities} disabled={loading}>Refresh</button>
+              <button type="button" className="admin-btn admin-btn-ghost" onClick={loadActivities} disabled={loading}>
+                {loading ? <span className="admin-spinner" /> : '↻'} Refresh
+              </button>
             </div>
             <div className="admin-table-wrap">
               <table className="admin-table">
@@ -656,25 +927,32 @@ export default function AdminPanel() {
                 <tbody>
                   {activities.map((a) => (
                     <tr key={a.id}>
-                      <td>{a.id}</td>
-                      <td>{a.name}</td>
-                      <td>{a.type ?? '—'}</td>
-                      <td>{a.price ?? '—'}</td>
-                      <td>{a.season ?? '—'}</td>
+                      <td style={{ color: 'var(--text-3)', fontWeight: 600 }}>#{a.id}</td>
+                      <td style={{ fontWeight: 600 }}>{a.name}</td>
+                      <td>{a.type ? <span className="admin-badge admin-badge-teal">{a.type}</span> : <span className="admin-muted">—</span>}</td>
+                      <td>{a.price != null ? <strong>${a.price}</strong> : <span className="admin-muted">—</span>}</td>
+                      <td>{a.season ?? <span className="admin-muted">—</span>}</td>
                       <td>
                         {a.destination
-                          ? `${a.destination.city ?? ''}, ${a.destination.country ?? ''} (#${a.destination.id})`
-                          : '—'}
+                          ? `${a.destination.city ?? ''}, ${a.destination.country ?? ''}`
+                          : <span className="admin-muted">—</span>}
                       </td>
-                      <td className="admin-actions">
-                        <button type="button" className="admin-link" onClick={() => editActivity(a)}>Edit</button>
-                        <button type="button" className="admin-link danger" onClick={() => deleteActivity(a.id)}>Delete</button>
+                      <td>
+                        <div className="admin-actions">
+                          <EditBtn onClick={() => editActivity(a)} />
+                          <DeleteBtn onClick={() => deleteActivity(a.id)} />
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {!loading && activities.length === 0 && <p className="admin-empty">No activities yet.</p>}
+              {!loading && activities.length === 0 && (
+                <div className="admin-empty">
+                  <span className="admin-empty-icon">🎯</span>
+                  No activities yet. Create one or seed sample data.
+                </div>
+              )}
             </div>
           </section>
         </div>
@@ -770,7 +1048,9 @@ export default function AdminPanel() {
           <section className="admin-card admin-card--table admin-card--glass">
             <div className="admin-card-head">
               <h2>All users</h2>
-              <button type="button" className="admin-btn admin-btn-ghost" onClick={loadUsers} disabled={loading}>Refresh</button>
+              <button type="button" className="admin-btn admin-btn-ghost" onClick={loadUsers} disabled={loading}>
+                {loading ? <span className="admin-spinner" /> : '↻'} Refresh
+              </button>
             </div>
             <div className="admin-table-wrap">
               <table className="admin-table">
@@ -787,22 +1067,276 @@ export default function AdminPanel() {
                 <tbody>
                   {users.map((u) => (
                     <tr key={u.id}>
-                      <td>{u.id}</td>
-                      <td>{u.firstName} {u.lastName}</td>
-                      <td>{u.email}</td>
-                      <td>{u.role}</td>
-                      <td>{u.phone ?? '—'}</td>
-                      <td className="admin-actions">
-                        <button type="button" className="admin-link" onClick={() => editUser(u)}>Edit</button>
-                        <button type="button" className="admin-link danger" onClick={() => deleteUser(u.id)}>Delete</button>
+                      <td style={{ color: 'var(--text-3)', fontWeight: 600 }}>#{u.id}</td>
+                      <td><UserCell firstName={u.firstName} lastName={u.lastName} /></td>
+                      <td style={{ fontSize: '0.82rem' }}>{u.email}</td>
+                      <td><RoleBadge role={u.role} /></td>
+                      <td style={{ fontSize: '0.82rem' }}>{u.phone ?? <span className="admin-muted">—</span>}</td>
+                      <td>
+                        <div className="admin-actions">
+                          <EditBtn onClick={() => editUser(u)} />
+                          <DeleteBtn onClick={() => deleteUser(u.id)} />
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {!loading && users.length === 0 && <p className="admin-empty">No users found.</p>}
+              {!loading && users.length === 0 && (
+                <div className="admin-empty">
+                  <span className="admin-empty-icon">👥</span>
+                  No users found.
+                </div>
+              )}
             </div>
           </section>
+        </div>
+      )}
+
+      {tab === 'destinations' && (
+        <div className="admin-grid">
+          <section className="admin-card admin-card--glass">
+            <h2>{destinationForm.id ? `Edit destination #${destinationForm.id}` : 'New destination'}</h2>
+            <p className="admin-hint">This section manages destination profiles shown in discovery and search.</p>
+            <form className="admin-form" onSubmit={saveDestination}>
+              <label>
+                Country *
+                <input
+                  type="text"
+                  value={destinationForm.country}
+                  onChange={(e) => setDestinationForm((f) => ({ ...f, country: e.target.value }))}
+                  required
+                />
+              </label>
+              <label>
+                City *
+                <input
+                  type="text"
+                  value={destinationForm.city}
+                  onChange={(e) => setDestinationForm((f) => ({ ...f, city: e.target.value }))}
+                  required
+                />
+              </label>
+              <label>
+                Climate
+                <input
+                  type="text"
+                  value={destinationForm.climate}
+                  onChange={(e) => setDestinationForm((f) => ({ ...f, climate: e.target.value }))}
+                />
+              </label>
+              <label>
+                Description
+                <textarea
+                  rows={3}
+                  value={destinationForm.description}
+                  onChange={(e) => setDestinationForm((f) => ({ ...f, description: e.target.value }))}
+                />
+              </label>
+              <label>
+                Image URL
+                <input
+                  type="url"
+                  value={destinationForm.imageUrl}
+                  onChange={(e) => setDestinationForm((f) => ({ ...f, imageUrl: e.target.value }))}
+                />
+              </label>
+              <label>
+                Estimated budget
+                <input
+                  type="number"
+                  step="0.01"
+                  value={destinationForm.estimatedBudget}
+                  onChange={(e) => setDestinationForm((f) => ({ ...f, estimatedBudget: e.target.value }))}
+                />
+              </label>
+              <label>
+                Average rating (0-5)
+                <input
+                  type="number"
+                  min="0"
+                  max="5"
+                  step="0.1"
+                  value={destinationForm.averageRating}
+                  onChange={(e) => setDestinationForm((f) => ({ ...f, averageRating: e.target.value }))}
+                />
+              </label>
+              <label className="admin-check">
+                <input
+                  type="checkbox"
+                  checked={destinationForm.trending}
+                  onChange={(e) => setDestinationForm((f) => ({ ...f, trending: e.target.checked }))}
+                />
+                Trending
+              </label>
+              <div className="admin-form-actions">
+                <button type="submit" className="admin-btn admin-btn-primary">{destinationForm.id ? 'Update' : 'Create'}</button>
+                {destinationForm.id && (
+                  <button type="button" className="admin-btn admin-btn-ghost" onClick={resetDestinationForm}>Cancel edit</button>
+                )}
+              </div>
+            </form>
+          </section>
+
+          <section className="admin-card admin-card--table admin-card--glass">
+            <div className="admin-card-head">
+              <h2>All destinations</h2>
+              <button type="button" className="admin-btn admin-btn-ghost" onClick={loadDestinations} disabled={loading}>
+                {loading ? <span className="admin-spinner" /> : '↻'} Refresh
+              </button>
+            </div>
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>City</th>
+                    <th>Country</th>
+                    <th>Climate</th>
+                    <th>Budget</th>
+                    <th>Rating</th>
+                    <th>Trending</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {destinations.map((d) => (
+                    <tr key={d.id}>
+                      <td style={{ color: 'var(--text-3)', fontWeight: 600 }}>#{d.id}</td>
+                      <td style={{ fontWeight: 600 }}>{d.city}</td>
+                      <td>{d.country}</td>
+                      <td>{d.climate ?? <span className="admin-muted">—</span>}</td>
+                      <td>{d.estimatedBudget != null ? `$${d.estimatedBudget}` : <span className="admin-muted">—</span>}</td>
+                      <td>{d.averageRating != null ? `⭐ ${d.averageRating}` : <span className="admin-muted">—</span>}</td>
+                      <td><BoolBadge value={d.trending} trueLabel="Trending" falseLabel="Normal" /></td>
+                      <td>
+                        <div className="admin-actions">
+                          <EditBtn onClick={() => editDestination(d)} />
+                          <DeleteBtn onClick={() => deleteDestination(d.id)} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!loading && destinations.length === 0 && (
+                <div className="admin-empty">
+                  <span className="admin-empty-icon">🌍</span>
+                  No destinations found. Seed sample data to get started.
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {tab === 'billing' && (
+        <div>
+          <div className="admin-stats-row">
+            <div className="admin-stat-card">
+              <div className="admin-stat-card-label">Total payments</div>
+              <div className="admin-stat-card-value teal">{payments.length}</div>
+            </div>
+            <div className="admin-stat-card">
+              <div className="admin-stat-card-label">Revenue collected</div>
+              <div className="admin-stat-card-value teal">
+                ${payments.reduce((s, p) => s + (p.amount ?? 0), 0).toLocaleString()}
+              </div>
+            </div>
+            <div className="admin-stat-card">
+              <div className="admin-stat-card-label">Reservations</div>
+              <div className="admin-stat-card-value">{reservations.length}</div>
+            </div>
+            <div className="admin-stat-card">
+              <div className="admin-stat-card-label">Paid</div>
+              <div className="admin-stat-card-value teal">
+                {payments.filter(p => (p.status ?? '').toUpperCase() === 'PAID').length}
+              </div>
+            </div>
+          </div>
+
+          <div className="admin-grid">
+            <section className="admin-card admin-card--table admin-card--glass">
+              <div className="admin-card-head">
+                <h2>Payments</h2>
+                <button type="button" className="admin-btn admin-btn-ghost" onClick={loadBilling} disabled={loading}>
+                  {loading ? <span className="admin-spinner" /> : '↻'} Refresh
+                </button>
+              </div>
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>User</th>
+                      <th>Amount</th>
+                      <th>Status</th>
+                      <th>Method</th>
+                      <th>Hotel</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payments.map((p) => (
+                      <tr key={p.id}>
+                        <td style={{ color: 'var(--text-3)', fontWeight: 600 }}>#{p.id}</td>
+                        <td><UserCell firstName={p.userFirstName} lastName={p.userLastName} email={p.userEmail} /></td>
+                        <td>{p.amount != null ? <strong>${p.amount}</strong> : <span className="admin-muted">—</span>}</td>
+                        <td><PayStatusBadge status={p.status} /></td>
+                        <td>{p.method ?? <span className="admin-muted">—</span>}</td>
+                        <td>{p.hotelName ?? <span className="admin-muted">—</span>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!loading && payments.length === 0 && (
+                  <div className="admin-empty">
+                    <span className="admin-empty-icon">💳</span>
+                    No payments found.
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="admin-card admin-card--table admin-card--glass">
+              <div className="admin-card-head">
+                <h2>Reservations</h2>
+              </div>
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>User</th>
+                      <th>Hotel</th>
+                      <th>Status</th>
+                      <th>Check-in</th>
+                      <th>Check-out</th>
+                      <th>Persons</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reservations.map((r) => (
+                      <tr key={r.id}>
+                        <td style={{ color: 'var(--text-3)', fontWeight: 600 }}>#{r.id}</td>
+                        <td><UserCell firstName={r.userFirstName} lastName={r.userLastName} email={r.userEmail} /></td>
+                        <td>{r.hotelName ?? <span className="admin-muted">—</span>}</td>
+                        <td><PayStatusBadge status={r.status} /></td>
+                        <td style={{ fontSize: '0.82rem' }}>{r.checkIn ?? <span className="admin-muted">—</span>}</td>
+                        <td style={{ fontSize: '0.82rem' }}>{r.checkOut ?? <span className="admin-muted">—</span>}</td>
+                        <td>{r.numberOfPersons ?? <span className="admin-muted">—</span>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!loading && reservations.length === 0 && (
+                  <div className="admin-empty">
+                    <span className="admin-empty-icon">🏨</span>
+                    No reservations found.
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
         </div>
       )}
       </main>

@@ -29,3 +29,24 @@ export async function apiFetch(path, options = {}, token) {
   if (ct?.includes('application/json')) return res.json()
   return res.text()
 }
+
+/** GET (or other) public endpoints: never sends Authorization (avoids 403 with stale JWT on permitAll routes). */
+export async function apiFetchPublic(path, options = {}) {
+  const headers = { ...options.headers }
+  const hasBody = options.body != null && options.body !== ''
+  if (hasBody && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json'
+  }
+
+  const res = await fetch(apiUrl(path), { ...options, headers })
+  if (!res.ok) {
+    const text = await res.text()
+    const err = new Error(text || `HTTP ${res.status}`)
+    err.status = res.status
+    throw err
+  }
+  if (res.status === 204) return null
+  const ct = res.headers.get('content-type')
+  if (ct?.includes('application/json')) return res.json()
+  return res.text()
+}
