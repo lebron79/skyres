@@ -7,9 +7,10 @@ export function apiUrl(path) {
 
 /** @param {string | null | undefined} token */
 export async function apiFetch(path, options = {}, token) {
-  const authToken =
-    token ||
+  const raw =
+    token ??
     (typeof localStorage !== 'undefined' ? localStorage.getItem('authToken') : null)
+  const authToken = typeof raw === 'string' ? raw.trim() : raw
   const headers = { ...options.headers }
   const hasBody = options.body != null && options.body !== ''
   if (hasBody && !headers['Content-Type']) {

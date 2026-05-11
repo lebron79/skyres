@@ -14,4 +14,6 @@ public class PaymentResponse {
     private String method;
     private PaymentStatus status;
     private LocalDateTime paidAt;
+    /** Set for user-facing payment lists */
+    private String hotelName;
 }

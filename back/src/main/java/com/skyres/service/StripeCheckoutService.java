@@ -38,13 +38,13 @@ public class StripeCheckoutService {
         String successUrl = base + "/payment/success?session_id={CHECKOUT_SESSION_ID}";
         String cancelUrl = base + "/payment/cancel";
 
-        long unitAmountCents = req.getAmountUsd()
+        long unitAmountCents = req.getAmountEur()
                 .multiply(BigDecimal.valueOf(100))
                 .setScale(0, RoundingMode.HALF_UP)
                 .longValueExact();
 
         if (unitAmountCents < 50) {
-            throw new IllegalArgumentException("Amount must be at least $0.50 USD.");
+            throw new IllegalArgumentException("Amount must be at least €0.50.");
         }
 
         String productName = truncate(req.getName().trim(), 120);
@@ -63,14 +63,16 @@ public class StripeCheckoutService {
                                 .setQuantity(1L)
                                 .setPriceData(
                                         SessionCreateParams.LineItem.PriceData.builder()
-                                                .setCurrency("usd")
+                                                .setCurrency("eur")
                                                 .setUnitAmount(unitAmountCents)
                                                 .setProductData(
                                                         SessionCreateParams.LineItem.PriceData.ProductData.builder()
                                                                 .setName(productName)
-                                                                .setDescription(type.equals("guide")
-                                                                        ? "Guide session (hourly rate — first unit)"
-                                                                        : "Activity booking")
+                                                                .setDescription(switch (type) {
+                                                                    case "guide" -> "Guide session (hourly rate — first unit)";
+                                                                    case "reservation" -> "Hotel reservation (SkyRes)";
+                                                                    default -> "Activity booking";
+                                                                })
                                                                 .build()
                                                 )
                                                 .build()

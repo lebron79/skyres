@@ -7,14 +7,17 @@ import com.skyres.dto.request.UpdateUserRequest;
 import com.skyres.dto.response.UserProfileResponse;
 import com.skyres.model.entity.User;
 import com.skyres.model.enums.Role;
+import com.skyres.repository.ReservationRepository;
 import com.skyres.repository.UserRepository;
-import com.skyres.security.JwtUtil;
 import com.skyres.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import org.springframework.http.HttpStatus;
 
 import java.util.List;
 
@@ -23,6 +26,7 @@ import java.util.List;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final ReservationRepository reservationRepository;
     private final PasswordEncoder passwordEncoder;
 
     private String getCurrentEmail() {
@@ -43,6 +47,7 @@ public class UserServiceImpl implements UserService {
                 .phone(u.getPhone())
                 .bio(u.getBio())
                 .createdAt(u.getCreatedAt())
+                .reservationCount(reservationRepository.countByUser_Id(u.getId()))
                 .build();
     }
 
@@ -84,10 +89,17 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void changePassword(Long id, ChangePasswordRequest request) {
-        User u = userRepository.findById(id).orElseThrow(() -> new RuntimeException("User not found"));
-        String current = request.getCurrentPassword();
-        if (!passwordEncoder.matches(current, u.getPassword())) {
-            throw new RuntimeException("Current password is incorrect");
+        String actorEmail = getCurrentEmail();
+        if (actorEmail == null || actorEmail.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Not authenticated");
+        }
+        User u = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        if (!u.getEmail().equalsIgnoreCase(actorEmail.trim())) {
+            throw new IllegalArgumentException("You can only change your own password");
+        }
+        if (!passwordEncoder.matches(request.getCurrentPassword(), u.getPassword())) {
+            throw new IllegalArgumentException("Current password is incorrect");
         }
         u.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(u);

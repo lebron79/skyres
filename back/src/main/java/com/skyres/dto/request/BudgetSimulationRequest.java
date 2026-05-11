@@ -21,4 +21,10 @@ public class BudgetSimulationRequest {
     private int numberOfPersons;
 
     private String couponCode;
+
+    /** Optional second code — allowed in simulation only when userId has zero prior reservations. */
+    private String secondCouponCode;
+
+    /** When set, used with reservation count to allow stacking two codes in the preview. */
+    private Long userId;
 }

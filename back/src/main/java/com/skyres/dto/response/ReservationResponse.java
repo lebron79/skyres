@@ -18,6 +18,12 @@ public class ReservationResponse {
     private String destinationCity;
     /** Country from hotel's destination (for UI summaries). */
     private String destinationCountry;
+    /** Hotel's destination id when linked. */
+    private Long destinationId;
+    /** Nights × (hotel TND rate → EUR) × persons (EUR). */
+    private Double hotelStaySubtotal;
+    /** Destination profile budget, once per stay (EUR). */
+    private Double destinationPackageFee;
     private LocalDate checkIn;
     private LocalDate checkOut;
     private int numberOfPersons;

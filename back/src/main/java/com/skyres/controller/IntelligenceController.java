@@ -2,6 +2,7 @@ package com.skyres.controller;
 
 import com.skyres.dto.request.ChatbotRequest;
 import com.skyres.dto.request.RecommendationRequest;
+import com.skyres.dto.response.ChatbotResponse;
 import com.skyres.model.entity.Activity;
 import com.skyres.service.IntelligenceService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -9,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/intelligence")
@@ -30,7 +30,7 @@ public class IntelligenceController {
     }
 
     @PostMapping("/chatbot")
-    public Map<String, String> chatbot(@RequestBody ChatbotRequest request) {
-        return Map.of("reply", intelligenceService.chatbotReply(request.getMessage()));
+    public ChatbotResponse chatbot(@RequestBody ChatbotRequest request) {
+        return intelligenceService.ragChat(request);
     }
 }

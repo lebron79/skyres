@@ -94,6 +94,7 @@ export default function AdminPanel() {
   const [users, setUsers] = useState([])
   const [payments, setPayments] = useState([])
   const [reservations, setReservations] = useState([])
+  const [guideApplications, setGuideApplications] = useState([])
   const [loading, setLoading] = useState(false)
   const [seedLoading, setSeedLoading] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
@@ -223,14 +224,29 @@ export default function AdminPanel() {
     }
   }, [token])
 
+  const loadGuideApplications = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await apiFetch('/api/admin/guide-applications?status=PENDING', { method: 'GET' }, token)
+      setGuideApplications(Array.isArray(data) ? data : [])
+    } catch (e) {
+      setError(e.message || 'Failed to load guide applications')
+      setGuideApplications([])
+    } finally {
+      setLoading(false)
+    }
+  }, [token])
+
   useEffect(() => {
     if (user?.role !== 'ADMIN') return
     if (tab === 'guides') loadGuides()
     else if (tab === 'activities') loadActivities()
     else if (tab === 'destinations') loadDestinations()
     else if (tab === 'users') loadUsers()
+    else if (tab === 'guideApplications') loadGuideApplications()
     else loadBilling()
-  }, [tab, user?.role, loadGuides, loadActivities, loadDestinations, loadUsers, loadBilling])
+  }, [tab, user?.role, loadGuides, loadActivities, loadDestinations, loadUsers, loadGuideApplications, loadBilling])
 
   useEffect(() => {
     refreshUser()
@@ -561,6 +577,33 @@ export default function AdminPanel() {
     }
   }
 
+  const approveGuideApplication = async (id) => {
+    setError(null)
+    try {
+      await apiFetch(`/api/admin/guide-applications/${id}/approve`, { method: 'POST', body: '{}' }, token)
+      showSuccess('Application approved — user is now a guide.')
+      await loadGuideApplications()
+    } catch (err) {
+      setError(err.message || 'Approve failed')
+    }
+  }
+
+  const rejectGuideApplication = async (id) => {
+    const reason = window.prompt('Optional message for the applicant (shown on their apply page):', '') ?? ''
+    setError(null)
+    try {
+      await apiFetch(
+        `/api/admin/guide-applications/${id}/reject`,
+        { method: 'POST', body: JSON.stringify({ reason }) },
+        token
+      )
+      showSuccess('Application rejected.')
+      await loadGuideApplications()
+    } catch (err) {
+      setError(err.message || 'Reject failed')
+    }
+  }
+
   if (user?.role !== 'ADMIN') {
     return <AccessDenied />
   }
@@ -570,6 +613,7 @@ export default function AdminPanel() {
     activities: activities.length,
     destinations: destinations.length,
     users: users.length,
+    guideApplications: guideApplications.length,
     billing: payments.length,
   }
 
@@ -578,6 +622,7 @@ export default function AdminPanel() {
     activities:   { label: 'Activities catalogue',       sub: 'Create experiences — use Groq AI to fill metadata from the activity name.' },
     destinations: { label: 'Destination management',    sub: 'Create and maintain destination cards used across search and activities.' },
     users:        { label: 'User management',           sub: 'Create, edit profiles/roles, and delete platform users.' },
+    guideApplications: { label: 'Guide applications',   sub: 'Review requests from tourists who want to become guides.' },
     billing:      { label: 'Payments & Reservations',   sub: 'Track paid users, payment status, and reservation records.' },
   }
 
@@ -599,6 +644,7 @@ export default function AdminPanel() {
             { key: 'activities',   icon: '🎯', label: 'Activities' },
             { key: 'destinations', icon: '🌍', label: 'Destinations' },
             { key: 'users',        icon: '👥', label: 'Users' },
+            { key: 'guideApplications', icon: '📝', label: 'Guide apps' },
             { key: 'billing',      icon: '💳', label: 'Billing' },
           ].map(({ key, icon, label }) => (
             <button
@@ -1223,6 +1269,72 @@ export default function AdminPanel() {
                 <div className="admin-empty">
                   <span className="admin-empty-icon">🌍</span>
                   No destinations found. Seed sample data to get started.
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {tab === 'guideApplications' && (
+        <div className="admin-grid">
+          <section className="admin-card admin-card--table admin-card--glass" style={{ gridColumn: '1 / -1' }}>
+            <div className="admin-card-head">
+              <h2>Pending guide applications</h2>
+              <button type="button" className="admin-btn admin-btn-ghost" onClick={loadGuideApplications} disabled={loading}>
+                {loading ? <span className="admin-spinner" /> : '↻'} Refresh
+              </button>
+            </div>
+            <p className="admin-hint" style={{ marginTop: 0 }}>
+              Approving creates the guide profile, sets the user role to <strong>GUIDE</strong>, and lists them publicly.
+              The applicant should refresh their session or sign in again to get a JWT with the new role.
+            </p>
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Applicant</th>
+                    <th>Languages</th>
+                    <th>Rate</th>
+                    <th>Region</th>
+                    <th>Pitch</th>
+                    <th>Submitted</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {guideApplications.map((a) => (
+                    <tr key={a.id}>
+                      <td style={{ color: 'var(--text-3)', fontWeight: 600 }}>#{a.id}</td>
+                      <td>
+                        <UserCell firstName={a.userFirstName} lastName={a.userLastName} email={a.userEmail} />
+                      </td>
+                      <td>{a.languages ?? <span className="admin-muted">—</span>}</td>
+                      <td>{a.hourlyRate != null ? `$${a.hourlyRate}/hr` : <span className="admin-muted">—</span>}</td>
+                      <td>{a.region ?? <span className="admin-muted">—</span>}</td>
+                      <td style={{ maxWidth: 220, whiteSpace: 'pre-wrap', fontSize: '0.85rem' }}>
+                        {a.pitch || <span className="admin-muted">—</span>}
+                      </td>
+                      <td>{a.createdAt ? new Date(a.createdAt).toLocaleString() : '—'}</td>
+                      <td>
+                        <div className="admin-actions">
+                          <button type="button" className="admin-action-btn admin-action-btn-edit" onClick={() => approveGuideApplication(a.id)}>
+                            ✓ Approve
+                          </button>
+                          <button type="button" className="admin-action-btn admin-action-btn-delete" onClick={() => rejectGuideApplication(a.id)}>
+                            ✗ Reject
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!loading && guideApplications.length === 0 && (
+                <div className="admin-empty">
+                  <span className="admin-empty-icon">📝</span>
+                  No pending applications.
                 </div>
               )}
             </div>

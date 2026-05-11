@@ -193,6 +193,10 @@
   width: 80px;
   height: 80px;
   flex-shrink: 0;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  overflow: hidden;
 }
 
 .photo-preview img {

@@ -42,11 +42,23 @@ public class PdfGenerator {
             addRow(table, "Reservation ID", String.valueOf(reservation.getId()), headerFont, normalFont);
             addRow(table, "Guest", reservation.getUserFullName(), headerFont, normalFont);
             addRow(table, "Hotel", reservation.getHotelName(), headerFont, normalFont);
+            if (reservation.getDestinationCity() != null || reservation.getDestinationCountry() != null) {
+                String dc = reservation.getDestinationCity() != null ? reservation.getDestinationCity() : "";
+                String dco = reservation.getDestinationCountry() != null ? reservation.getDestinationCountry() : "";
+                String loc = dc.isEmpty() ? dco : dco.isEmpty() ? dc : dc + ", " + dco;
+                addRow(table, "Destination", loc, headerFont, normalFont);
+            }
             addRow(table, "Check-in", reservation.getCheckIn().toString(), headerFont, normalFont);
             addRow(table, "Check-out", reservation.getCheckOut().toString(), headerFont, normalFont);
             addRow(table, "Persons", String.valueOf(reservation.getNumberOfPersons()), headerFont, normalFont);
             addRow(table, "Status", reservation.getStatus().name(), headerFont, normalFont);
-            addRow(table, "Total Price", "$" + String.format("%.2f", reservation.getTotalPrice()), headerFont, normalFont);
+            if (reservation.getHotelStaySubtotal() != null) {
+                addRow(table, "Hotel stay (EUR)", String.format("%.2f €", reservation.getHotelStaySubtotal()), headerFont, normalFont);
+            }
+            if (reservation.getDestinationPackageFee() != null && reservation.getDestinationPackageFee() > 0) {
+                addRow(table, "Destination package (EUR)", String.format("%.2f €", reservation.getDestinationPackageFee()), headerFont, normalFont);
+            }
+            addRow(table, "Total (EUR)", String.format("%.2f €", reservation.getTotalPrice()), headerFont, normalFont);
 
             document.add(table);
 

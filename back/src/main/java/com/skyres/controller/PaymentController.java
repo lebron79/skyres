@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/payments")
 @RequiredArgsConstructor
@@ -23,14 +25,25 @@ public class PaymentController {
         return ResponseEntity.ok(paymentService.create(request));
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<PaymentResponse> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(paymentService.getById(id));
+    /** Literal path must stay before {@code /{id}} so "me" is not parsed as a numeric id. */
+    @GetMapping("/me")
+    public ResponseEntity<List<PaymentResponse>> listMine() {
+        return ResponseEntity.ok(paymentService.listForCurrentUser());
+    }
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<PaymentResponse>> listByUser(@PathVariable Long userId) {
+        return ResponseEntity.ok(paymentService.listByUserId(userId));
     }
 
     @GetMapping("/reservation/{reservationId}")
     public ResponseEntity<PaymentResponse> getByReservation(@PathVariable Long reservationId) {
         return ResponseEntity.ok(paymentService.getByReservationId(reservationId));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<PaymentResponse> getById(@PathVariable Long id) {
+        return ResponseEntity.ok(paymentService.getById(id));
     }
 
     @PutMapping("/{id}/status")

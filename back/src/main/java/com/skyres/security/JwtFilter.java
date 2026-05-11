@@ -27,17 +27,16 @@ public class JwtFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
         String header = request.getHeader("Authorization");
-
-        if (header == null || !header.startsWith("Bearer ")) {
+        String token = extractBearerToken(header);
+        if (token == null) {
             chain.doFilter(request, response);
             return;
         }
-
-        String token = header.substring(7);
         try {
             String username = jwtUtil.extractUsername(token);
             if (username != null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                String email = username.trim();
+                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
                 if (jwtUtil.isValid(token, userDetails)) {
                     var auth = new UsernamePasswordAuthenticationToken(
                             userDetails, null, userDetails.getAuthorities());
@@ -46,8 +45,21 @@ public class JwtFilter extends OncePerRequestFilter {
                 }
             }
         } catch (Exception ignored) {
-            // Malformed / bad signature — leave anonymous; AuthorizationFilter returns 403.
+            // Malformed / bad signature — leave anonymous; entry point returns 401.
         }
         chain.doFilter(request, response);
+    }
+
+    /** Accepts "Bearer <jwt>" with any case on "Bearer" and trims whitespace. */
+    private static String extractBearerToken(String header) {
+        if (header == null || header.isBlank()) {
+            return null;
+        }
+        String h = header.trim();
+        if (h.length() < 8 || !h.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            return null;
+        }
+        String t = h.substring(7).trim();
+        return t.isEmpty() ? null : t;
     }
 }

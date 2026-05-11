@@ -22,4 +22,7 @@ public class UserProfileResponse {
     private String phone;
     private String bio;
     private LocalDateTime createdAt;
+
+    /** Used for UI: first-time bookers may stack two distinct promo codes. */
+    private Long reservationCount;
 }

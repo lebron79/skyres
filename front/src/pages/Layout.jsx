@@ -1,8 +1,10 @@
-import { Outlet, Link, useLocation } from 'react-router-dom'
+import { Outlet, Link, NavLink, useLocation } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import UserMenu from '../components/UserMenu.jsx'
 import Settings from './Settings.jsx'
+import TripCartSidebar from '../components/TripCartSidebar.jsx'
+import SkyAssistant from '../components/SkyAssistant.jsx'
 
 export default function Layout() {
   const { user } = useAuth()
@@ -39,16 +41,81 @@ export default function Layout() {
           SkyRes
         </Link>
         <ul className="nav-links">
-          <li><Link to="/hotels">Hôtels</Link></li>
-          <li><Link to="/destinations">Destinations</Link></li>
-          {user && <li><Link to="/reservations">Reservations</Link></li>}
-          <li><Link to="/#guides">Guides</Link></li>
-          <li><Link to="/#activities">Activities</Link></li>
-          <li><Link to="/#how">How it works</Link></li>
-          <li><Link to="/#reviews">Stories</Link></li>
-          <li><Link to="/#team">Team</Link></li>
+          <li>
+            <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : undefined)}>
+              Accueil
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/hotels" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+              Hôtels
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/destinations" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+              Destinations
+            </NavLink>
+          </li>
+          {user && (
+            <li>
+              <NavLink to="/reservations" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+                Reservations
+              </NavLink>
+            </li>
+          )}
+          {user?.role === 'TOURIST' && (
+            <li>
+              <NavLink to="/apply-guide" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+                Become a guide
+              </NavLink>
+            </li>
+          )}
+          <li>
+            <Link
+              to="/#guides"
+              className={location.pathname === '/' && location.hash === '#guides' ? 'active' : undefined}
+            >
+              Guides
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="/#activities"
+              className={location.pathname === '/' && location.hash === '#activities' ? 'active' : undefined}
+            >
+              Activities
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="/#how"
+              className={location.pathname === '/' && location.hash === '#how' ? 'active' : undefined}
+            >
+              How it works
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="/#reviews"
+              className={location.pathname === '/' && location.hash === '#reviews' ? 'active' : undefined}
+            >
+              Stories
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="/#team"
+              className={location.pathname === '/' && location.hash === '#team' ? 'active' : undefined}
+            >
+              Team
+            </Link>
+          </li>
           {user?.role === 'ADMIN' && (
-            <li><Link to="/admin">Admin</Link></li>
+            <li>
+              <NavLink to="/admin" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+                Admin
+              </NavLink>
+            </li>
           )}
         </ul>
         <div className="nav-right">
@@ -66,9 +133,15 @@ export default function Layout() {
 
       <div style={{ height: navbarHeight }} />
 
-      <Outlet />
+      <div className="layout-shell">
+        <div className="layout-shell-main">
+          <Outlet />
+        </div>
+        <TripCartSidebar />
+      </div>
 
       {showSettings && <Settings onClose={() => setShowSettings(false)} />}
+      <SkyAssistant />
     </>
   )
 }

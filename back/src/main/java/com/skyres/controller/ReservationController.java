@@ -7,8 +7,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,19 +29,36 @@ public class ReservationController {
         return ResponseEntity.ok(reservationService.create(request));
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<ReservationResponse> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(reservationService.getById(id));
-    }
-
+    /** Declared before `/{id}` so `/user/...` is never captured as a numeric id. */
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<ReservationResponse>> getByUser(@PathVariable Long userId) {
         return ResponseEntity.ok(reservationService.getByUserId(userId));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<ReservationResponse> getById(@PathVariable Long id) {
+        return ResponseEntity.ok(reservationService.getById(id));
+    }
+
     @PutMapping("/{id}/cancel")
     public ResponseEntity<ReservationResponse> cancel(@PathVariable Long id) {
         return ResponseEntity.ok(reservationService.cancel(id));
+    }
+
+    /**
+     * Permanently removes a cancelled reservation from the user's list.
+     * Must be authenticated as the reservation owner.
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteCancelled(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails principal
+    ) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        reservationService.deleteCancelledIfOwned(id, principal.getUsername());
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}/pdf")

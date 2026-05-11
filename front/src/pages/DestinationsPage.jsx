@@ -1,8 +1,10 @@
 // ============================================================
 // src/pages/DestinationsPage.jsx
 // ============================================================
-import { useState, useEffect, useCallback } from 'react'
-import { useAuth } from '../context/AuthContext'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext.jsx'
+import { useTripCart } from '../context/TripCartContext.jsx'
 import { destinationAPI } from '../services/destinationAPI'
 import './DestinationsPage.css'
 
@@ -37,10 +39,18 @@ const StarIcon = () => (
 
 // ─── Formulaire vide ─────────────────────────────────────────
 const EMPTY_FORM = {
-   country: '', city: '',
-  description: '', climate: '',
-  rating: '', price: '', trending: false,
+  country: '',
+  city: '',
+  description: '',
+  climate: '',
+  rating: '',
+  price: '',
+  trending: false,
+  imageUrl: '',
 }
+
+const DP_CAROUSEL_GAP = 16
+const DP_CAROUSEL_AUTO_MS = 2800
 
 // ─── Modal ───────────────────────────────────────────────────
 function DestinationModal({ initial, onSave, onClose, saving }) {
@@ -77,6 +87,14 @@ function DestinationModal({ initial, onSave, onClose, saving }) {
             <label>Description</label>
             <textarea value={form.description} onChange={set('description')}
               rows={3} placeholder="Décrivez la destination…"/>
+          </div>
+          <div className="dp-field dp-field--full">
+            <label>URL de l’image</label>
+            <input
+              value={form.imageUrl ?? ''}
+              onChange={set('imageUrl')}
+              placeholder="https://…"
+            />
           </div>
           <div className="dp-field">
             <label>Climat</label>
@@ -134,6 +152,17 @@ function ViewDestinationModal({ dest, onClose }) {
           <div className="dp-view-field"><strong>Note :</strong> {dest.averageRating ?? '—'}</div>
           <div className="dp-view-field"><strong>Prix (€) :</strong> {dest.estimatedBudget ?? '—'}</div>
           <div className="dp-view-field"><strong>Tendance :</strong> {dest.trending ? 'Oui 🔥' : 'Non'}</div>
+          {(dest.imageUrl || dest.image_url) && (
+            <div className="dp-view-field dp-view-field--full">
+              <strong>Image :</strong>
+              <br />
+              <img
+                className="dp-view-image"
+                src={dest.imageUrl || dest.image_url}
+                alt=""
+              />
+            </div>
+          )}
           {dest.createdAt && <div className="dp-view-field"><strong>Créé le :</strong> {new Date(dest.createdAt).toLocaleString()}</div>}
           {dest.updatedAt && <div className="dp-view-field"><strong>Mis à jour :</strong> {new Date(dest.updatedAt).toLocaleString()}</div>}
         </div>
@@ -147,13 +176,42 @@ function ViewDestinationModal({ dest, onClose }) {
 }
 
 
+function destinationImageUrl(dest) {
+  const u = dest?.imageUrl ?? dest?.image_url
+  return u && String(u).trim() ? String(u).trim() : ''
+}
+
 // ─── Carte ───────────────────────────────────────────────────
-function DestCard({ dest, onEdit, onDelete,onView, deleting }) {
+function DestCard({ dest, onEdit, onDelete, onView, deleting, isAdmin, onGuestPickDest }) {
+  const [imgFailed, setImgFailed] = useState(false)
+  const photo = destinationImageUrl(dest)
+  const showPhoto = photo && !imgFailed
+  const title =
+    (dest.name && String(dest.name).trim()) ||
+    [dest.city, dest.country].filter(Boolean).join(', ') ||
+    'Destination'
+
   return (
     <article className="dp-card">
-      {dest.trending && <span className="dp-trending-badge">🔥 Tendance</span>}
+      <div className="dp-card-media">
+        {showPhoto ? (
+          <img
+            className="dp-card-img"
+            src={photo}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <div className="dp-card-media-placeholder" aria-hidden>
+            <span className="dp-card-media-placeholder-icon">🌍</span>
+          </div>
+        )}
+        {dest.trending && <span className="dp-trending-badge">🔥 Tendance</span>}
+      </div>
       <div className="dp-card-body">
-        <h3 className="dp-card-name">{dest.name}</h3>
+        <h3 className="dp-card-name">{title}</h3>
         <p className="dp-card-location">
           {[dest.city, dest.country].filter(Boolean).join(', ')}
         </p>
@@ -174,20 +232,34 @@ function DestCard({ dest, onEdit, onDelete,onView, deleting }) {
           </div>
         )}
       </div>
-      <div className="dp-card-actions">
-         <button className="dp-btn dp-btn--ghost dp-btn--sm" onClick={() => onView(dest)}>
+      <div className={`dp-card-actions${isAdmin ? ' dp-card-actions--admin' : ' dp-card-actions--guest'}`}>
+        <button type="button" className="dp-btn dp-btn--ghost dp-btn--sm" onClick={() => onView(dest)}>
           👁️ Voir plus
         </button>
-        <button className="dp-btn dp-btn--ghost dp-btn--sm" onClick={() => onEdit(dest)}>
-          <EditIcon /> Modifier
-        </button>
-        <button
-          className="dp-btn dp-btn--danger dp-btn--sm"
-          disabled={deleting}
-          onClick={() => onDelete(dest.id)}
-        >
-          <TrashIcon /> {deleting ? '…' : 'Supprimer'}
-        </button>
+        {isAdmin ? (
+          <>
+            <button type="button" className="dp-btn dp-btn--ghost dp-btn--sm" onClick={() => onEdit(dest)}>
+              <EditIcon /> Modifier
+            </button>
+            <button
+              type="button"
+              className="dp-btn dp-btn--danger dp-btn--sm"
+              disabled={deleting}
+              onClick={() => onDelete(dest.id)}
+            >
+              <TrashIcon /> {deleting ? '…' : 'Supprimer'}
+            </button>
+          </>
+        ) : (
+          <Link
+            className="dp-btn dp-btn--primary dp-btn--sm"
+            to={`/hotels?destinationId=${dest.id}`}
+            title="Ajoute la destination au panier (€) et ouvre les hôtels assignés."
+            onClick={() => onGuestPickDest?.(dest)}
+          >
+            🏨 Voir les hôtels
+          </Link>
+        )}
       </div>
     </article>
   )
@@ -234,7 +306,48 @@ const TABS = [
 
 // ─── Page principale ──────────────────────────────────────────
 export default function DestinationsPage() {
-  const { token } = useAuth()
+  const { token, user } = useAuth()
+  const { setTripDestination } = useTripCart()
+  const isAdmin = user?.role === 'ADMIN'
+  const carouselRef = useRef(null)
+  const [carouselDot, setCarouselDot] = useState(0)
+
+  const syncDestCarouselDots = useCallback(() => {
+    const el = carouselRef.current
+    if (!el) return
+    const max = el.scrollWidth - el.clientWidth
+    if (max <= 4) {
+      setCarouselDot(0)
+      return
+    }
+    const t = el.scrollLeft / max
+    setCarouselDot(Math.min(2, Math.floor(t * 2.999)))
+  }, [])
+
+  const scrollDestCarousel = useCallback((dir) => {
+    const el = carouselRef.current
+    if (!el) return
+    const card = el.querySelector('.dp-card')
+    if (!card) return
+    const delta = card.offsetWidth + DP_CAROUSEL_GAP
+    const max = el.scrollWidth - el.clientWidth
+    if (max <= 4) return
+    if (dir < 0) {
+      if (el.scrollLeft <= 4) el.scrollTo({ left: max, behavior: 'smooth' })
+      else el.scrollBy({ left: -delta, behavior: 'smooth' })
+    } else {
+      if (el.scrollLeft >= max - 4) el.scrollTo({ left: 0, behavior: 'smooth' })
+      else el.scrollBy({ left: delta, behavior: 'smooth' })
+    }
+  }, [])
+
+  const scrollDestCarouselToThird = useCallback((i) => {
+    const el = carouselRef.current
+    if (!el) return
+    const max = el.scrollWidth - el.clientWidth
+    if (max <= 4) return
+    el.scrollTo({ left: max * (i / 2), behavior: 'smooth' })
+  }, [])
 
   // API instanciée avec le token courant
   const api = destinationAPI(token)
@@ -249,6 +362,29 @@ export default function DestinationsPage() {
   const [search,       setSearch]       = useState('')
   const [showFilter,   setShowFilter]   = useState(false)
   const [toast,        setToast]        = useState('')
+
+  useEffect(() => {
+    const el = carouselRef.current
+    if (!el || destinations.length === 0) return undefined
+    const step = () => {
+      const card = el.querySelector('.dp-card')
+      if (!card) return
+      const delta = card.offsetWidth + DP_CAROUSEL_GAP
+      const max = el.scrollWidth - el.clientWidth
+      if (max <= 4) return
+      if (el.scrollLeft >= max - 4) el.scrollTo({ left: 0, behavior: 'smooth' })
+      else el.scrollBy({ left: delta, behavior: 'smooth' })
+    }
+    const id = setInterval(step, DP_CAROUSEL_AUTO_MS)
+    return () => clearInterval(id)
+  }, [destinations])
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(syncDestCarouselDots)
+    })
+    return () => cancelAnimationFrame(id)
+  }, [destinations, syncDestCarouselDots])
 
   // ── Fetch selon tab ────────────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -324,7 +460,20 @@ export default function DestinationsPage() {
     setToast(msg)
     setTimeout(() => setToast(''), 2800)
   }
-  const [viewDest, setViewDest] = useState(null)  
+  const [viewDest, setViewDest] = useState(null)
+
+  const pickDestinationForTrip = useCallback(
+    (dest) => {
+      const raw = Number(dest?.estimatedBudget ?? dest?.estimated_budget)
+      setTripDestination({
+        id: dest.id,
+        city: dest.city,
+        country: dest.country,
+        priceEur: Number.isFinite(raw) && raw > 0 ? raw : 0,
+      })
+    },
+    [setTripDestination]
+  )
 
   return (
     <div className="dp-page">
@@ -332,6 +481,7 @@ export default function DestinationsPage() {
 
       {modal && (
         <DestinationModal
+          key={modal.dest?.id ?? 'new-dest'}
           initial={modal.dest || {}}
           onSave={handleSave}
           onClose={() => setModal(null)}
@@ -343,11 +493,15 @@ export default function DestinationsPage() {
       <div className="dp-header">
         <div>
           <h1 className="dp-title">Destinations</h1>
-          <p className="dp-subtitle">Gérez vos destinations de voyage</p>
+          <p className="dp-subtitle">
+            {isAdmin ? 'Gérez vos destinations de voyage' : 'Explorez nos destinations et trouvez un hôtel'}
+          </p>
         </div>
-        <button className="dp-btn dp-btn--primary" onClick={() => setModal({})}>
-          <PlusIcon /> Ajouter
-        </button>
+        {isAdmin && (
+          <button className="dp-btn dp-btn--primary" onClick={() => setModal({})}>
+            <PlusIcon /> Ajouter
+          </button>
+        )}
       </div>
 
       {/* Tabs */}
@@ -401,24 +555,62 @@ export default function DestinationsPage() {
         <div className="dp-empty">
           <span>🗺️</span>
           <p>Aucune destination trouvée.</p>
-          {tab === 'all' && (
+          {tab === 'all' && isAdmin && (
             <button className="dp-btn dp-btn--primary" onClick={() => setModal({})}>
               <PlusIcon/> Créer la première
             </button>
           )}
         </div>
       ) : (
-        <div className="dp-grid">
-          {destinations.map((d) => (
-            <DestCard
-              key={d.id}
-              dest={d}
-              onEdit={(dest) => setModal({ dest })}
-              onView={() => setViewDest(d)}   
-              onDelete={handleDelete}
-              deleting={deletingId === d.id}
-            />
-          ))}
+        <div className="dp-carousel-shell">
+          <button
+            type="button"
+            className="dp-carousel-arrow dp-carousel-arrow--prev"
+            aria-label="Faire défiler vers la gauche"
+            onClick={() => scrollDestCarousel(-1)}
+          >
+            ‹
+          </button>
+          <div className="dp-carousel-track">
+            <div
+              className="dp-carousel"
+              ref={carouselRef}
+              onScroll={syncDestCarouselDots}
+            >
+              {destinations.map((d) => (
+                <DestCard
+                  key={d.id}
+                  dest={d}
+                  isAdmin={isAdmin}
+                  onEdit={(dest) => setModal({ dest })}
+                  onView={() => setViewDest(d)}
+                  onDelete={handleDelete}
+                  deleting={deletingId === d.id}
+                  onGuestPickDest={pickDestinationForTrip}
+                />
+              ))}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="dp-carousel-arrow dp-carousel-arrow--next"
+            aria-label="Faire défiler vers la droite"
+            onClick={() => scrollDestCarousel(1)}
+          >
+            ›
+          </button>
+          <div className="dp-carousel-dots" role="tablist" aria-label="Position du carrousel">
+            {[0, 1, 2].map((i) => (
+              <button
+                key={i}
+                type="button"
+                role="tab"
+                aria-selected={carouselDot === i}
+                className={`dp-carousel-dot${carouselDot === i ? ' dp-carousel-dot--active' : ''}`}
+                onClick={() => scrollDestCarouselToThird(i)}
+              />
+            ))}
+          </div>
         </div>
       )}
 

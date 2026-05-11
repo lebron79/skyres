@@ -1,0 +1,297 @@
+.trip-cart {
+  width: 300px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 96px;
+  align-self: flex-start;
+  padding: 0 16px 32px 0;
+}
+
+.trip-cart-inner {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 14px;
+  padding: 16px 16px 18px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.06);
+}
+
+.trip-cart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.trip-cart-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text, #111);
+}
+
+.trip-cart-clear {
+  border: none;
+  background: transparent;
+  color: var(--text-3, #6b7280);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.trip-cart-clear:hover {
+  color: var(--coral, #c2410c);
+}
+
+.trip-cart-block {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border, #eee);
+}
+
+.trip-cart-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3, #6b7280);
+  margin-bottom: 6px;
+}
+
+.trip-cart-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.88rem;
+  color: var(--text-2, #374151);
+}
+
+.trip-cart-line--stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.trip-cart-line strong {
+  color: var(--teal, #0d9488);
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.trip-cart-hotel-name {
+  font-weight: 700;
+  color: var(--text, #111);
+}
+
+.trip-cart-muted {
+  font-size: 0.78rem;
+  color: var(--text-3, #6b7280);
+}
+
+.trip-cart-hint,
+.trip-cart-pick {
+  margin: 8px 0 0;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--text-3, #6b7280);
+}
+
+.trip-cart-pick {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.trip-cart-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.trip-cart-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-2, #374151);
+}
+
+.trip-cart-controls input {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #e5e7eb);
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.trip-cart-coupon-block {
+  border-bottom: 1px solid var(--border, #eee);
+}
+
+.trip-cart-coupon-hint {
+  margin: 0 0 8px;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--text-3, #6b7280);
+}
+
+.trip-cart-coupon-list {
+  margin: 0 0 10px;
+  padding: 0 0 0 16px;
+  font-size: 0.72rem;
+  color: var(--text-2, #374151);
+  line-height: 1.5;
+}
+
+.trip-cart-coupon-list code {
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: var(--bg-alt, #f3f4f6);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.trip-cart-coupon-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.trip-cart-coupon-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #e5e7eb);
+  font: inherit;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.trip-cart-coupon-apply {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: none;
+  background: var(--teal, #0d9488);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.trip-cart-coupon-apply:hover {
+  filter: brightness(1.06);
+}
+
+.trip-cart-coupon-msg {
+  margin: 0 0 8px;
+  font-size: 0.72rem;
+  color: var(--coral, #b45309);
+}
+
+.trip-cart-coupon-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.trip-cart-coupon-chips li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(13, 148, 136, 0.1);
+  border-radius: 999px;
+  padding: 2px 4px 2px 10px;
+  font-size: 0.72rem;
+}
+
+.trip-cart-chip {
+  font-weight: 700;
+  color: var(--teal, #0f766e);
+}
+
+.trip-cart-chip-remove {
+  border: none;
+  background: transparent;
+  color: var(--text-2, #374151);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 4px;
+  border-radius: 50%;
+}
+
+.trip-cart-chip-remove:hover {
+  color: var(--coral, #c2410c);
+}
+
+.trip-cart-discount {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 0.86rem;
+  color: var(--text-2, #374151);
+}
+
+.trip-cart-discount strong {
+  color: var(--coral, #b45309);
+  font-size: 0.95rem;
+}
+
+.trip-cart-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.trip-cart-total strong {
+  font-size: 1.1rem;
+  color: var(--teal, #0d9488);
+}
+
+.trip-cart-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trip-cart-btn {
+  text-align: center;
+  text-decoration: none;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.84rem;
+  border: 1px solid transparent;
+}
+
+.trip-cart-btn--primary {
+  background: var(--teal, #0d9488);
+  color: #fff;
+}
+
+.trip-cart-btn--primary:hover {
+  filter: brightness(1.05);
+}
+
+.trip-cart-btn--ghost {
+  border-color: var(--border, #e5e7eb);
+  color: var(--text, #111);
+  background: var(--bg-alt, #f9fafb);
+}
+
+@media (max-width: 1100px) {
+  .trip-cart {
+    display: none;
+  }
+}

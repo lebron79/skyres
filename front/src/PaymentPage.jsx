@@ -1,13 +1,18 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from './context/AuthContext.jsx'
+import CheckoutProgress from './components/CheckoutProgress.jsx'
 import { apiFetch } from './services/api.js'
 import { decodeCheckoutName, humanizeApiError } from './checkoutUi.js'
 import './PaymentPage.css'
 
-function formatMoney(amount) {
+function formatMoneyEur(amount) {
   if (amount == null || Number.isNaN(amount)) return null
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount)
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'EUR',
+    maximumFractionDigits: 2,
+  }).format(amount)
 }
 
 export default function PaymentPage() {
@@ -17,16 +22,20 @@ export default function PaymentPage() {
   const name = useMemo(() => decodeCheckoutName(searchParams.get('name')), [searchParams])
   const rawPrice = searchParams.get('price')
   const priceNum = rawPrice != null && rawPrice !== '' ? Number(rawPrice) : NaN
-  const priceLabel = Number.isFinite(priceNum) ? formatMoney(priceNum) : null
+  const priceLabel = Number.isFinite(priceNum) ? formatMoneyEur(priceNum) : null
   const id = searchParams.get('id')
+  const refId = searchParams.get('refId') ?? id
 
   const isActivity = type === 'activity'
   const isGuide = type === 'guide'
-  const valid = isActivity || isGuide
+  const isReservation = type === 'reservation'
+  const valid = isActivity || isGuide || isReservation
   const canCheckout = valid && Number.isFinite(priceNum) && priceNum >= 0.5 && !!token
 
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
+  /** User must confirm order on Review before seeing Stripe (Pay). */
+  const [checkoutPhase, setCheckoutPhase] = useState('review')
 
   const startCheckout = async () => {
     if (!canCheckout) return
@@ -39,9 +48,9 @@ export default function PaymentPage() {
           method: 'POST',
           body: JSON.stringify({
             type,
-            refId: id ?? '',
+            refId: refId ?? '',
             name,
-            amountUsd: priceNum,
+            amountEur: priceNum,
           }),
         },
         token
@@ -69,20 +78,7 @@ export default function PaymentPage() {
       </header>
 
       <main className="cx-main">
-        <ol className="cx-steps" aria-label="Checkout progress">
-          <li className="cx-step cx-step-done">
-            <span className="cx-step-dot">1</span>
-            <span>Review</span>
-          </li>
-          <li className="cx-step cx-step-active">
-            <span className="cx-step-dot">2</span>
-            <span>Pay</span>
-          </li>
-          <li className="cx-step">
-            <span className="cx-step-dot">3</span>
-            <span>Done</span>
-          </li>
-        </ol>
+        {valid && <CheckoutProgress phase={checkoutPhase === 'review' ? 'review' : 'pay'} />}
 
         {!valid ? (
           <div className="cx-panel cx-panel-solo">
@@ -90,24 +86,26 @@ export default function PaymentPage() {
             <p className="cx-eyebrow">Checkout</p>
             <h1 className="cx-title">Nothing to pay yet</h1>
             <p className="cx-body">
-              Pick an activity or guide on the home page, then use Book again to open checkout.
+              Pick an activity, guide, or complete a hotel reservation, then open checkout again.
             </p>
             <Link to="/" className="cx-btn cx-btn-primary">Browse SkyRes</Link>
           </div>
-        ) : (
-          <div className="cx-grid">
-            <section className="cx-panel">
+        ) : checkoutPhase === 'review' ? (
+          <div className="cx-grid cx-grid-review">
+            <section className="cx-panel cx-panel-review">
               <p className="cx-eyebrow">Order summary</p>
               <h1 className="cx-title cx-title-clamp">{name}</h1>
               <ul className="cx-rows">
                 <li>
                   <span>Type</span>
-                  <span className="cx-tag">{isActivity ? 'Activity' : 'Guide'}</span>
+                  <span className="cx-tag">
+                    {isActivity ? 'Activity' : isGuide ? 'Guide' : 'Reservation'}
+                  </span>
                 </li>
-                {id != null && id !== '' && (
+                {refId != null && refId !== '' && (
                   <li>
                     <span>Reference</span>
-                    <span className="cx-mono">#{id}</span>
+                    <span className="cx-mono">#{refId}</span>
                   </li>
                 )}
                 {isGuide && priceLabel && (
@@ -116,18 +114,73 @@ export default function PaymentPage() {
                     <span>{priceLabel} / hr</span>
                   </li>
                 )}
-                {isActivity && priceLabel && (
+                {(isActivity || isReservation) && priceLabel && (
                   <li>
-                    <span>Total</span>
+                    <span>Total (EUR)</span>
                     <span className="cx-price">{priceLabel}</span>
                   </li>
                 )}
               </ul>
               {!priceLabel && (
-                <p className="cx-hint">Set a price in admin (min. $0.50) so checkout can run.</p>
+                <p className="cx-hint">Set a price (min. €0.50) so checkout can run.</p>
               )}
               {priceLabel && Number.isFinite(priceNum) && priceNum < 0.5 && (
-                <p className="cx-hint">Stripe needs at least $0.50 for a test charge.</p>
+                <p className="cx-hint">Stripe needs at least €0.50 for a test charge.</p>
+              )}
+              {!token && (
+                <p className="cx-hint cx-hint-warn">Session missing — go home and sign in again.</p>
+              )}
+              <div className="cx-review-actions">
+                <button
+                  type="button"
+                  className="cx-btn cx-btn-primary cx-btn-wide"
+                  disabled={!priceLabel || !Number.isFinite(priceNum) || priceNum < 0.5 || !token}
+                  onClick={() => setCheckoutPhase('pay')}
+                >
+                  Continue to payment
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : (
+          <div className="cx-grid cx-grid-pay">
+            <section className="cx-panel">
+              <button type="button" className="cx-back-step" onClick={() => setCheckoutPhase('review')}>
+                ← Back to review
+              </button>
+              <p className="cx-eyebrow">Order summary</p>
+              <h1 className="cx-title cx-title-clamp">{name}</h1>
+              <ul className="cx-rows">
+                <li>
+                  <span>Type</span>
+                  <span className="cx-tag">
+                    {isActivity ? 'Activity' : isGuide ? 'Guide' : 'Reservation'}
+                  </span>
+                </li>
+                {refId != null && refId !== '' && (
+                  <li>
+                    <span>Reference</span>
+                    <span className="cx-mono">#{refId}</span>
+                  </li>
+                )}
+                {isGuide && priceLabel && (
+                  <li>
+                    <span>Rate</span>
+                    <span>{priceLabel} / hr</span>
+                  </li>
+                )}
+                {(isActivity || isReservation) && priceLabel && (
+                  <li>
+                    <span>Total (EUR)</span>
+                    <span className="cx-price">{priceLabel}</span>
+                  </li>
+                )}
+              </ul>
+              {!priceLabel && (
+                <p className="cx-hint">Set a price (min. €0.50) so checkout can run.</p>
+              )}
+              {priceLabel && Number.isFinite(priceNum) && priceNum < 0.5 && (
+                <p className="cx-hint">Stripe needs at least €0.50 for a test charge.</p>
               )}
               {!token && (
                 <p className="cx-hint cx-hint-warn">Session missing — go home and sign in again.</p>
@@ -141,7 +194,7 @@ export default function PaymentPage() {
                 </svg>
               </div>
               <p className="cx-eyebrow">Secure pay</p>
-              <h2 className="cx-subtitle">Stripe Checkout</h2>
+              <h2 className="cx-subtitle">Stripe Checkout (EUR)</h2>
               <p className="cx-body">
                 You’ll finish on Stripe’s page (test mode). Try{' '}
                 <strong className="cx-cc">4242 4242 4242 4242</strong>

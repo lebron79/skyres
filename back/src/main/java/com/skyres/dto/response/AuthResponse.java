@@ -19,4 +19,6 @@ public class AuthResponse {
     private String photoUrl;
     private String bio;
     private LocalDateTime createdAt;
+
+    private Long reservationCount;
 }

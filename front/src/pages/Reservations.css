@@ -261,6 +261,18 @@
 }
 .res-action-btn.cancel:hover { background: #dc2626; color: white; }
 
+.res-action-btn.delete {
+  background: rgba(254, 242, 242, 0.95);
+  color: #991b1b;
+  border-color: rgba(239, 68, 68, 0.45);
+}
+
+.res-action-btn.delete:hover {
+  background: #dc2626;
+  color: #fff;
+  border-color: #dc2626;
+}
+
 /* ── BOOK STEP ── */
 .res-book-hotel {
   display: flex;
@@ -831,6 +843,162 @@
   justify-content: center;
   margin-top: 8px;
   padding-bottom: 20px;
+}
+
+.res-book-estimate {
+  margin-bottom: 1.25rem;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(13, 148, 136, 0.07);
+}
+
+.res-book-estimate > strong {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+.res-book-estimate .res-summary-grid {
+  margin-top: 0;
+}
+
+.res-book-estimate-note {
+  margin: 10px 0 0;
+  font-size: 0.78rem;
+  color: var(--text-3);
+  line-height: 1.45;
+}
+
+.res-book-estimate .res-summary-discount strong {
+  color: #166534;
+}
+
+.res-book-coupon-block {
+  margin: 1rem 0 0.5rem;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.res-book-coupon-title {
+  margin: 0 0 6px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.res-book-coupon-hint {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  color: var(--text-2);
+  line-height: 1.45;
+}
+
+.res-book-coupon-list {
+  margin: 0 0 12px;
+  padding-left: 1.1rem;
+  font-size: 0.78rem;
+  color: var(--text-2);
+}
+
+.res-book-coupon-list code {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.res-book-coupon-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.res-book-coupon-input {
+  flex: 1;
+  min-width: 140px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-family: inherit;
+}
+
+.res-book-coupon-apply {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: var(--teal);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.res-book-coupon-apply:hover {
+  filter: brightness(1.05);
+}
+
+.res-book-coupon-msg {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-2);
+}
+
+.res-book-coupon-chips {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.res-book-coupon-chips li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.res-book-chip {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(10, 114, 101, 0.12);
+  color: var(--teal);
+}
+
+.res-book-chip-remove {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--text-3);
+  padding: 0 4px;
+}
+
+.res-book-chip-remove:hover {
+  color: #b91c1c;
+}
+
+.res-stripe-only .res-stripe-cta {
+  display: inline-block;
+  margin-top: 12px;
+  text-decoration: none;
+  text-align: center;
+}
+
+.res-stripe-note {
+  margin: 14px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-3);
+  line-height: 1.5;
+  max-width: 36rem;
 }
 
 /* ── RESPONSIVE ── */

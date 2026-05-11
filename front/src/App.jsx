@@ -11,6 +11,9 @@ import PaymentSuccess from './PaymentSuccess.jsx'
 import PaymentCancel from './PaymentCancel.jsx'
 import RequireAuth from './RequireAuth.jsx'
 import Reservations from './pages/Reservations.jsx'
+import PaymentHistory from './pages/PaymentHistory.jsx'
+import GuideApply from './pages/GuideApply.jsx'
+import { TripCartProvider } from './context/TripCartContext.jsx'
 import './App.css'
 
 export default function App() {
@@ -34,6 +37,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <TripCartProvider>
       <Routes>
         <Route
           path="/login"
@@ -75,6 +79,15 @@ export default function App() {
             }
           />
           <Route
+            path="/payments"
+            element={
+              <RequireAuth>
+                <PaymentHistory />
+              </RequireAuth>
+            }
+          />
+          <Route path="/apply-guide" element={<GuideApply />} />
+          <Route
             path="/payment"
             element={
               <RequireAuth>
@@ -102,6 +115,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </TripCartProvider>
     </BrowserRouter>
   )
 }

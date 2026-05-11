@@ -1,0 +1,166 @@
+.pay-hist {
+  min-height: 60vh;
+  padding: 28px 24px 48px;
+  background: var(--bg, #faf9f7);
+}
+
+.pay-hist-inner {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.pay-hist-back {
+  display: inline-block;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-2, #374151);
+  text-decoration: none;
+  margin-bottom: 20px;
+}
+
+.pay-hist-back:hover {
+  color: var(--teal, #0d9488);
+}
+
+.pay-hist-head {
+  margin-bottom: 28px;
+}
+
+.pay-hist-kicker {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--teal, #0d9488);
+}
+
+.pay-hist-title {
+  margin: 0 0 8px;
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text, #111);
+}
+
+.pay-hist-sub {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-3, #6b7280);
+  max-width: 520px;
+  line-height: 1.5;
+}
+
+.pay-hist-status,
+.pay-hist-empty {
+  color: var(--text-3, #6b7280);
+  font-size: 0.95rem;
+}
+
+.pay-hist-error {
+  color: #b91c1c;
+  font-size: 0.92rem;
+}
+
+.pay-hist-table-wrap {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e8e6e3);
+  border-radius: 14px;
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.06);
+  overflow: auto;
+}
+
+.pay-hist-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.pay-hist-table th,
+.pay-hist-table td {
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border, #eee);
+}
+
+.pay-hist-table th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3, #6b7280);
+  font-weight: 700;
+  background: rgba(13, 148, 136, 0.06);
+}
+
+.pay-hist-table tr:last-child td {
+  border-bottom: none;
+}
+
+.pay-hist-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--teal, #0f766e);
+}
+
+.pay-hist-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.pay-hist-badge--paid {
+  background: rgba(13, 148, 136, 0.18);
+  color: #0f766e;
+}
+
+.pay-hist-badge--pending {
+  background: rgba(180, 83, 9, 0.2);
+  color: #9a3412;
+}
+
+.pay-hist-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.pay-hist-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 22px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: filter 0.15s, background 0.15s;
+}
+
+.pay-hist-btn--primary {
+  background: var(--teal, #0d9488);
+  color: #fff;
+}
+
+.pay-hist-btn--primary:hover {
+  filter: brightness(1.06);
+}
+
+.pay-hist-btn--ghost {
+  background: var(--surface, #fff);
+  border-color: var(--border, #e5e7eb);
+  color: var(--text, #111);
+}
+
+.pay-hist-btn--ghost:hover {
+  border-color: var(--teal, #0d9488);
+  color: var(--teal, #0f766e);
+}

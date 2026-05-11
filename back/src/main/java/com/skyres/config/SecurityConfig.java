@@ -36,7 +36,6 @@ public class SecurityConfig {
         "/",
         "/api/health",
         "/api/auth/**",
-        "/api/guides/**",
         "/api/activities/**",
         "/api/intelligence/**",
         "/swagger-ui/**",
@@ -62,6 +61,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/stories/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/destinations").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/destinations/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/guides/**").permitAll()
                         .requestMatchers(PUBLIC_ROUTES).permitAll()
                         .requestMatchers("/api/admin/**").authenticated()
                         .anyRequest().authenticated()

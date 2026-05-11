@@ -23,6 +23,7 @@ public class ReservationRequest {
     @Min(value = 1, message = "At least 1 person required")
     private int numberOfPersons;
 
-    // optional coupon code
+    // optional coupon code(s); second allowed only for users with no prior reservation (see server)
     private String couponCode;
+    private String secondCouponCode;
 }

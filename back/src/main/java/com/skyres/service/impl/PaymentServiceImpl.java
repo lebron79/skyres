@@ -4,16 +4,20 @@ import com.skyres.dto.request.PaymentRequest;
 import com.skyres.dto.response.PaymentResponse;
 import com.skyres.model.entity.Payment;
 import com.skyres.model.entity.Reservation;
+import com.skyres.model.entity.User;
 import com.skyres.model.enums.PaymentStatus;
 import com.skyres.model.enums.ReservationStatus;
 import com.skyres.repository.PaymentRepository;
 import com.skyres.repository.ReservationRepository;
+import com.skyres.repository.UserRepository;
 import com.skyres.service.PaymentService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -21,6 +25,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final ReservationRepository reservationRepository;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional
@@ -66,6 +71,38 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<PaymentResponse> listByUserId(Long userId) {
+        Long meId = requireCurrentUserId();
+        if (!meId.equals(userId)) {
+            throw new IllegalArgumentException("You can only view your own payments");
+        }
+        return paymentRepository.findByReservation_User_IdOrderByIdDesc(userId).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PaymentResponse> listForCurrentUser() {
+        Long meId = requireCurrentUserId();
+        return paymentRepository.findByReservation_User_IdOrderByIdDesc(meId).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    private Long requireCurrentUserId() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new IllegalArgumentException("Authentication required");
+        }
+        String email = auth.getName();
+        User me = userRepository.findByEmailIgnoreCase(email.trim())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        return me.getId();
+    }
+
+    @Override
     @Transactional
     public PaymentResponse updateStatus(Long id, PaymentStatus status) {
         Payment p = findById(id);
@@ -81,13 +118,19 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     private PaymentResponse toResponse(Payment p) {
+        Reservation r = p.getReservation();
+        String hotelName = null;
+        if (r != null && r.getHotel() != null) {
+            hotelName = r.getHotel().getName();
+        }
         return PaymentResponse.builder()
                 .id(p.getId())
-                .reservationId(p.getReservation().getId())
+                .reservationId(r != null ? r.getId() : null)
                 .amount(p.getAmount())
                 .method(p.getMethod())
                 .status(p.getStatus())
                 .paidAt(p.getPaidAt())
+                .hotelName(hotelName)
                 .build();
     }
 }

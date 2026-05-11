@@ -1,11 +1,34 @@
 // ============================================================
 // src/pages/HotelsPage.jsx
 // ============================================================
-import { useState, useEffect, useCallback } from 'react'
-import { useAuth } from '../context/AuthContext'
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
+import { useAuth } from '../context/AuthContext.jsx'
 import { hotelAPI } from '../services/hotelAPI'
-import { useSearchParams } from 'react-router-dom';
-import './HotelPage.css'   // tu peux copier/coller le CSS de DestinationsPage et remplacer "dp-" par "hp-"
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useTripCart } from '../context/TripCartContext.jsx'
+import { API_BASE } from '../services/api.js'
+import './HotelPage.css'
+
+/** Stored nightly price is in TND (د.ت) — show EUR using indicative rate for UI */
+const TND_PER_EUR = 3.42
+
+const HP_CAROUSEL_GAP = 22
+const HP_CAROUSEL_AUTO_MS = 2800
+/** Max dots shown (scroll is still mapped across the full strip). */
+const HOTEL_CAROUSEL_MAX_DOTS = 15
+
+function tndToEur(tnd) {
+  const n = Number(tnd)
+  if (!Number.isFinite(n) || n <= 0) return null
+  return n / TND_PER_EUR
+}
+
+function formatHotelNightPrice(tnd) {
+  const eur = tndToEur(tnd)
+  if (eur == null) return { line: `${tnd} D / nuit`, sub: null }
+  const eurStr = eur >= 100 ? eur.toFixed(0) : eur.toFixed(2)
+  return { line: `≈ ${eurStr} € / nuit`, sub: `(${Number(tnd)} D)` }
+}
 
 // ─── Icônes (identiques) ─────────────────────────────────────────
 const SearchIcon = () => (
@@ -174,60 +197,206 @@ function HotelModal({ initial, onSave, onClose, saving, destinations }) {
   )
 }
 
+function resolveHotelPhotoUrl(url) {
+  if (!url || !String(url).trim()) return null
+  const s = String(url).trim()
+  if (/^https?:\/\//i.test(s)) return s
+  const path = s.startsWith('/') ? s : `/${s}`
+  return `${API_BASE}${path}`
+}
+
 // ─── Modal de consultation (détails) ─────────────────────────
 function ViewHotelModal({ hotel, onClose }) {
+  const [heroFailed, setHeroFailed] = useState(false)
   if (!hotel) return null
+
+  const rawPhoto = hotel.photoUrl && String(hotel.photoUrl).trim()
+  const heroSrc = rawPhoto && !heroFailed ? resolveHotelPhotoUrl(rawPhoto) : null
+
+  const nightEur = tndToEur(hotel.pricePerNight)
+  const nightPriceDisplay =
+    nightEur != null
+      ? `${nightEur >= 100 ? nightEur.toFixed(0) : nightEur.toFixed(2)} €`
+      : null
+
+  const destBudget =
+    hotel.destination?.estimatedBudget != null && Number(hotel.destination.estimatedBudget) > 0
+      ? Number(hotel.destination.estimatedBudget).toFixed(0)
+      : null
+
+  const destLabel = hotel.destination
+    ? [hotel.destination.city, hotel.destination.country].filter(Boolean).join(', ')
+    : null
+
+  const amenityItems = [
+    hotel.hasOutdoorPool && { key: 'pool-o', icon: '🏊', label: 'Piscine ext.' },
+    hotel.hasIndoorPool && { key: 'pool-i', icon: '🏊', label: 'Piscine int.' },
+    hotel.hasBeach && { key: 'beach', icon: '🏖️', label: 'Plage' },
+    hotel.hasParking && { key: 'park', icon: '🅿️', label: 'Parking' },
+    hotel.hasSpa && { key: 'spa', icon: '💆', label: 'Spa' },
+    hotel.hasAirportShuttle && { key: 'shuttle', icon: '🚌', label: 'Navette' },
+    hotel.hasFitnessCenter && { key: 'gym', icon: '🏋️', label: 'Fitness' },
+    hotel.hasBar && { key: 'bar', icon: '🍹', label: 'Bar' },
+  ].filter(Boolean)
+
   return (
     <div className="hp-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="hp-modal" style={{ maxWidth: '700px' }}>
-        <div className="hp-modal-header">
-          <h2 className="hp-modal-title">Détails de l’hôtel</h2>
-          <button className="hp-close-btn" onClick={onClose}>✕</button>
+      <div
+        className="hp-modal hp-modal--detail"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="hp-view-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button type="button" className="hp-detail-close" onClick={onClose} aria-label="Fermer">
+          ✕
+        </button>
+
+        <div className="hp-detail-hero">
+          {heroSrc ? (
+            <img
+              src={heroSrc}
+              alt=""
+              className="hp-detail-hero-img"
+              loading="eager"
+              decoding="async"
+              onError={() => setHeroFailed(true)}
+            />
+          ) : (
+            <div className="hp-detail-hero-placeholder" aria-hidden>
+              <span>🏨</span>
+            </div>
+          )}
+          <div className="hp-detail-hero-scrim" aria-hidden />
+          <div className="hp-detail-hero-badges">
+            <span className="hp-detail-badge hp-detail-badge--stars" aria-label={`${hotel.stars} étoiles`}>
+              {'★'.repeat(Math.min(5, Math.max(1, hotel.stars || 1)))}
+            </span>
+            {hotel.averageRating != null && (
+              <span className="hp-detail-badge hp-detail-badge--rating">
+                <StarIcon /> {Number(hotel.averageRating).toFixed(1)} / 10
+              </span>
+            )}
+          </div>
         </div>
-        <div className="hp-view-grid">
-          <div><strong>ID :</strong> {hotel.id}</div>
-          <div><strong>Nom :</strong> {hotel.name}</div>
-          <div><strong>Adresse :</strong> {hotel.address}</div>
-          <div><strong>Étoiles :</strong> {'⭐'.repeat(hotel.stars)}</div>
-          <div><strong>Prix / nuit :</strong> {hotel.pricePerNight} D</div>
-          <div><strong>Note :</strong> {hotel.averageRating ?? '—'} /10</div>
-          <div><strong>Distance centre :</strong> {hotel.distanceToCenter} km</div>
-          <div><strong>Disponible :</strong> {hotel.available ? 'Oui' : 'Non'}</div>
-          
-        
-          {hotel.destination && (
-            <div>
-              <strong>Destination :</strong> {hotel.destination.city}, {hotel.destination.country}
+
+        <div className="hp-detail-body">
+          {destLabel && <p className="hp-detail-kicker">{destLabel}</p>}
+          <h2 id="hp-view-title" className="hp-detail-name">
+            {hotel.name}
+          </h2>
+
+          <div className="hp-detail-stats">
+            <div className="hp-detail-stat">
+              <span className="hp-detail-stat-label">Prix / nuit</span>
+              <span className="hp-detail-stat-value">
+                {nightPriceDisplay != null ? (
+                  <>
+                    ≈ {nightPriceDisplay}
+                    <span className="hp-detail-stat-sub"> ({hotel.pricePerNight} D)</span>
+                  </>
+                ) : (
+                  `${hotel.pricePerNight} D`
+                )}
+              </span>
+            </div>
+            <div className="hp-detail-stat">
+              <span className="hp-detail-stat-label">Centre-ville</span>
+              <span className="hp-detail-stat-value">{hotel.distanceToCenter ?? '—'} km</span>
+            </div>
+            <div className="hp-detail-stat">
+              <span className="hp-detail-stat-label">Disponibilité</span>
+              <span className={`hp-detail-stat-value ${hotel.available ? 'hp-detail-stat-value--ok' : ''}`}>
+                {hotel.available ? 'Disponible' : 'Indisponible'}
+              </span>
+            </div>
+          </div>
+
+          {destBudget != null && (
+            <div className="hp-detail-callout" role="note">
+              <span className="hp-detail-callout-title">Forfait destination</span>
+              <p className="hp-detail-callout-text">
+                <strong>{destBudget} €</strong> ajoutés une seule fois au total de votre séjour (en euros), avec
+                l’hébergement.
+              </p>
             </div>
           )}
 
-          <div className="hp-view-field--full"><strong>Équipements :</strong>
-            {[
-              hotel.hasOutdoorPool && 'Piscine ext.',
-              hotel.hasIndoorPool && 'Piscine int.',
-              hotel.hasBeach && 'Plage',
-              hotel.hasParking && 'Parking',
-              hotel.hasSpa && 'Spa',
-              hotel.hasAirportShuttle && 'Navette',
-              hotel.hasFitnessCenter && 'Fitness',
-              hotel.hasBar && 'Bar'
-            ].filter(Boolean).join(', ') || 'Aucun'}
-          </div>
-          <div className="hp-view-field--full"><strong>Description :</strong><br/>{hotel.description || '—'}</div>
-          {hotel.photoUrl && <div className="hp-view-field--full"><img src={hotel.photoUrl} alt="hôtel" style={{maxWidth:'100%', borderRadius:'8px'}}/></div>}
+          <dl className="hp-detail-dl">
+            <div className="hp-detail-dl-row">
+              <dt>Adresse</dt>
+              <dd>{hotel.address || '—'}</dd>
+            </div>
+            {destLabel && (
+              <div className="hp-detail-dl-row">
+                <dt>Destination</dt>
+                <dd>{destLabel}</dd>
+              </div>
+            )}
+            <div className="hp-detail-dl-row hp-detail-dl-row--muted">
+              <dt>Réf.</dt>
+              <dd>#{hotel.id}</dd>
+            </div>
+          </dl>
+
+          <section className="hp-detail-section">
+            <h3 className="hp-detail-section-title">Équipements</h3>
+            {amenityItems.length > 0 ? (
+              <ul className="hp-detail-amenities">
+                {amenityItems.map((a) => (
+                  <li key={a.key} className="hp-detail-amenity">
+                    <span aria-hidden>{a.icon}</span> {a.label}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="hp-detail-empty">Aucun équipement renseigné.</p>
+            )}
+          </section>
+
+          {hotel.description && (
+            <section className="hp-detail-section">
+              <h3 className="hp-detail-section-title">À propos</h3>
+              <p className="hp-detail-desc">{hotel.description}</p>
+            </section>
+          )}
         </div>
-        <div className="hp-modal-actions">
-          <button className="hp-btn hp-btn--primary" onClick={onClose}>Fermer</button>
+
+        <div className="hp-detail-footer">
+          <button type="button" className="hp-btn hp-btn--primary hp-detail-footer-btn" onClick={onClose}>
+            Fermer
+          </button>
         </div>
       </div>
     </div>
   )
 }
 // ─── Carte d’un hôtel ───────────────────────────────────────
-function HotelCard({ hotel, onEdit, onDelete, onView, deleting }) {
+function HotelCard({ hotel, onEdit, onDelete, onView, onReserve, deleting, isAdmin }) {
+  const [imgFailed, setImgFailed] = useState(false)
+  const photo = hotel.photoUrl && String(hotel.photoUrl).trim()
+  const showPhoto = photo && !imgFailed
+  const price = formatHotelNightPrice(hotel.pricePerNight)
+
   return (
     <article className="hp-card">
-      {hotel.stars >= 4 && <span className="hp-trending-badge">🏆 Très bien noté</span>}
+      <div className="hp-card-media">
+        {showPhoto ? (
+          <img
+            className="hp-card-img"
+            src={photo}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <div className="hp-card-media-placeholder" aria-hidden>
+            <span className="hp-card-media-placeholder-icon">🏨</span>
+          </div>
+        )}
+        {hotel.stars >= 4 && <span className="hp-trending-badge">🏆 Très bien noté</span>}
+      </div>
       <div className="hp-card-body">
         <h3 className="hp-card-name">{hotel.name}</h3>
         <p className="hp-card-location">{hotel.address}</p>
@@ -238,7 +407,9 @@ function HotelCard({ hotel, onEdit, onDelete, onView, deleting }) {
         )}
         <div className="hp-card-tags">
           <span className="hp-tag">⭐ {hotel.stars}</span>
-          <span className="hp-tag">{hotel.pricePerNight} D / nuit</span>
+          <span className="hp-tag hp-tag--price" title={price.sub || undefined}>
+            {price.line}
+          </span>
           {hotel.hasOutdoorPool && <span className="hp-tag">🏊 Piscine</span>}
           {hotel.hasParking && <span className="hp-tag">🅿️ Parking</span>}
         </div>
@@ -246,12 +417,29 @@ function HotelCard({ hotel, onEdit, onDelete, onView, deleting }) {
           <div className="hp-rating"><StarIcon /> {hotel.averageRating}/10</div>
         )}
       </div>
-      <div className="hp-card-actions">
-        <button className="hp-btn hp-btn--ghost hp-btn--sm" onClick={() => onView(hotel)}>👁️ Voir</button>
-        <button className="hp-btn hp-btn--ghost hp-btn--sm" onClick={() => onEdit(hotel)}><EditIcon /> Modifier</button>
-        <button className="hp-btn hp-btn--danger hp-btn--sm" disabled={deleting} onClick={() => onDelete(hotel.id)}>
-          <TrashIcon /> {deleting ? '…' : 'Supprimer'}
+      <div className={`hp-card-actions${isAdmin ? ' hp-card-actions--admin' : ' hp-card-actions--guest'}`}>
+        <button type="button" className="hp-btn hp-btn--ghost hp-btn--sm" onClick={() => onView(hotel)}>
+          👁️ Voir
         </button>
+        {isAdmin ? (
+          <>
+            <button type="button" className="hp-btn hp-btn--ghost hp-btn--sm" onClick={() => onEdit(hotel)}>
+              <EditIcon /> Modifier
+            </button>
+            <button
+              type="button"
+              className="hp-btn hp-btn--danger hp-btn--sm"
+              disabled={deleting}
+              onClick={() => onDelete(hotel.id)}
+            >
+              <TrashIcon /> {deleting ? '…' : 'Supprimer'}
+            </button>
+          </>
+        ) : (
+          <button type="button" className="hp-btn hp-btn--primary hp-btn--sm" onClick={() => onReserve(hotel)}>
+            Réserver
+          </button>
+        )}
       </div>
     </article>
   )
@@ -295,10 +483,44 @@ const TABS = [
 
 // ─── Page principale ─────────────────────────────────────────
 export default function HotelsPage() {
-  const { token } = useAuth()
-  const [searchParams] = useSearchParams();
-  const destinationId = searchParams.get('destinationId');
+  const { token, user } = useAuth()
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const destinationId = searchParams.get('destinationId')
+  const { setTripDestination, setTripHotel, destination: tripDestination } = useTripCart()
   const api = hotelAPI(token)
+  const isAdmin = user?.role === 'ADMIN'
+  const carouselRef = useRef(null)
+  const hotelScrollRafPending = useRef(false)
+  const [carouselDot, setCarouselDot] = useState(0)
+  /** Matches .hp-carousel breakpoints: 3 / 2 / 1 cards per view */
+  const [cardsPerView, setCardsPerView] = useState(3)
+
+  useEffect(() => {
+    const mq1100 = window.matchMedia('(max-width: 1100px)')
+    const mq640 = window.matchMedia('(max-width: 640px)')
+    const syncBp = () => {
+      if (mq640.matches) setCardsPerView(1)
+      else if (mq1100.matches) setCardsPerView(2)
+      else setCardsPerView(3)
+    }
+    syncBp()
+    mq1100.addEventListener('change', syncBp)
+    mq640.addEventListener('change', syncBp)
+    return () => {
+      mq1100.removeEventListener('change', syncBp)
+      mq640.removeEventListener('change', syncBp)
+    }
+  }, [])
+
+  const goReserveHotel = (hotel) => {
+    setTripHotel(hotel)
+    if (!token) {
+      navigate('/login', { state: { redirectTo: `/reservations?hotelId=${hotel.id}` } })
+      return
+    }
+    navigate(`/reservations?hotelId=${hotel.id}`)
+  }
 
   const [tab, setTab] = useState('all')
   const [hotels, setHotels] = useState([])
@@ -312,6 +534,158 @@ export default function HotelsPage() {
   const [toast, setToast] = useState('')
   const [viewHotel, setViewHotel] = useState(null)
   const [destinations, setDestinations] = useState([]) // pour le select
+  const [filterDestination, setFilterDestination] = useState(null)
+
+  const hotelCarouselDotCount = Math.max(
+    1,
+    Math.min(HOTEL_CAROUSEL_MAX_DOTS, Math.ceil(hotels.length / Math.max(1, cardsPerView)))
+  )
+
+  const syncHotelCarouselDots = useCallback(() => {
+    const el = carouselRef.current
+    if (!el) return
+    const max = el.scrollWidth - el.clientWidth
+    if (max <= 4) {
+      setCarouselDot(0)
+      return
+    }
+    const t = el.scrollLeft / max
+    const last = hotelCarouselDotCount - 1
+    if (last <= 0) {
+      setCarouselDot(0)
+      return
+    }
+    const dot = Math.min(last, Math.max(0, Math.round(t * last)))
+    setCarouselDot(dot)
+  }, [hotelCarouselDotCount])
+
+  const onHotelCarouselScroll = useCallback(() => {
+    if (hotelScrollRafPending.current) return
+    hotelScrollRafPending.current = true
+    requestAnimationFrame(() => {
+      hotelScrollRafPending.current = false
+      syncHotelCarouselDots()
+    })
+  }, [syncHotelCarouselDots])
+
+  const scrollHotelCarousel = useCallback((dir) => {
+    const el = carouselRef.current
+    if (!el) return
+    const card = el.querySelector('.hp-card')
+    if (!card) return
+    const delta = card.offsetWidth + HP_CAROUSEL_GAP
+    const max = el.scrollWidth - el.clientWidth
+    if (max <= 4) return
+    if (dir < 0) {
+      if (el.scrollLeft <= 4) el.scrollTo({ left: max, behavior: 'smooth' })
+      else el.scrollBy({ left: -delta, behavior: 'smooth' })
+    } else {
+      if (el.scrollLeft >= max - 4) el.scrollTo({ left: 0, behavior: 'smooth' })
+      else el.scrollBy({ left: delta, behavior: 'smooth' })
+    }
+  }, [])
+
+  const scrollHotelCarouselToDot = useCallback(
+    (i) => {
+      const el = carouselRef.current
+      if (!el) return
+      const max = el.scrollWidth - el.clientWidth
+      if (max <= 4) return
+      const last = hotelCarouselDotCount - 1
+      if (last <= 0) return
+      const clamped = Math.min(last, Math.max(0, i))
+      el.scrollTo({ left: max * (clamped / last), behavior: 'smooth' })
+    },
+    [hotelCarouselDotCount]
+  )
+
+  useEffect(() => {
+    setCarouselDot((d) => {
+      const last = Math.max(0, hotelCarouselDotCount - 1)
+      return Math.min(last, d)
+    })
+  }, [hotelCarouselDotCount])
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      syncHotelCarouselDots()
+    })
+    return () => cancelAnimationFrame(id)
+  }, [cardsPerView, syncHotelCarouselDots])
+
+  useEffect(() => {
+    if (!destinationId) {
+      setFilterDestination(null)
+      return
+    }
+    const id = Number(destinationId)
+    if (!Number.isFinite(id)) {
+      setFilterDestination(null)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { destinationAPI } = await import('../services/destinationAPI')
+        const d = await destinationAPI(token).getById(id)
+        if (!cancelled) setFilterDestination(d || null)
+      } catch {
+        if (!cancelled) setFilterDestination(null)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [destinationId, token])
+
+  useEffect(() => {
+    if (!filterDestination) return
+    const fid = filterDestination.id
+    if (!tripDestination || tripDestination.id !== fid) {
+      setTripDestination({
+        id: fid,
+        city: filterDestination.city,
+        country: filterDestination.country,
+        priceEur: Math.max(0, Number(filterDestination.estimatedBudget) || 0),
+      })
+    }
+  }, [filterDestination, tripDestination, setTripDestination])
+
+  useEffect(() => {
+    const el = carouselRef.current
+    if (!el || hotels.length === 0) return undefined
+    const step = () => {
+      const card = el.querySelector('.hp-card')
+      if (!card) return
+      const delta = card.offsetWidth + HP_CAROUSEL_GAP
+      const max = el.scrollWidth - el.clientWidth
+      if (max <= 4) return
+      if (el.scrollLeft >= max - 4) el.scrollTo({ left: 0, behavior: 'smooth' })
+      else el.scrollBy({ left: delta, behavior: 'smooth' })
+    }
+    const id = setInterval(step, HP_CAROUSEL_AUTO_MS)
+    return () => clearInterval(id)
+  }, [hotels])
+
+  useLayoutEffect(() => {
+    const el = carouselRef.current
+    if (!el || hotels.length === 0) return
+    el.scrollLeft = 0
+    setCarouselDot(0)
+    requestAnimationFrame(() => {
+      syncHotelCarouselDots()
+    })
+  }, [hotels, syncHotelCarouselDots])
+
+  useEffect(() => {
+    const el = carouselRef.current
+    if (!el || hotels.length === 0) return undefined
+    const sync = () => syncHotelCarouselDots()
+    el.addEventListener('scrollend', sync)
+    window.addEventListener('resize', sync)
+    return () => {
+      el.removeEventListener('scrollend', sync)
+      window.removeEventListener('resize', sync)
+    }
+  }, [hotels, syncHotelCarouselDots])
 
  // Charger les destinations (pour le select dans le modal)
   useEffect(() => {
@@ -371,7 +745,10 @@ export default function HotelsPage() {
     try {
       const filters = {}
       if (params.minStars) filters.minStars = parseInt(params.minStars)
-      if (params.maxPrice) filters.maxPrice = parseFloat(params.maxPrice)
+      if (params.maxPrice) {
+        const eur = parseFloat(params.maxPrice)
+        if (Number.isFinite(eur) && eur > 0) filters.maxPrice = eur * TND_PER_EUR
+      }
       if (params.hasPool) filters.hasPool = true
       if (params.hasParking) filters.hasParking = true
       if (params.hasSpa) filters.hasSpa = true
@@ -445,9 +822,34 @@ export default function HotelsPage() {
       )}
       {viewHotel && <ViewHotelModal hotel={viewHotel} onClose={() => setViewHotel(null)} />}
 
+      {filterDestination && (
+        <div className="hp-destination-strip" role="status">
+          <span>
+            <strong>{filterDestination.city}</strong>, {filterDestination.country} — {hotels.length} hôtel
+            {hotels.length !== 1 ? 's' : ''} lié{hotels.length !== 1 ? 's' : ''} à cette destination. Le total du panier (à droite) est en <strong>€</strong> (hôtel converti depuis le tarif nuit + forfait destination).
+          </span>
+          <Link to="/destinations" className="hp-btn hp-btn--ghost hp-btn--sm">
+            ← Destinations
+          </Link>
+        </div>
+      )}
+
       <div className="hp-header">
-        <div><h1 className="hp-title">Hôtels</h1><p className="hp-subtitle">Gérez vos établissements</p></div>
-        <button className="hp-btn hp-btn--primary" onClick={() => setModal({})}><PlusIcon /> Ajouter</button>
+        <div>
+          <h1 className="hp-title">Hôtels</h1>
+          <p className="hp-subtitle">
+            {filterDestination
+              ? `${filterDestination.city} — hébergements disponibles`
+              : isAdmin
+                ? 'Gérez vos établissements'
+                : 'Parcourez les hôtels et réservez votre séjour'}
+          </p>
+        </div>
+        {isAdmin && (
+          <button className="hp-btn hp-btn--primary" onClick={() => setModal({})}>
+            <PlusIcon /> Ajouter
+          </button>
+        )}
       </div>
 
       <div className="hp-tabs">
@@ -474,9 +876,65 @@ export default function HotelsPage() {
       {loading ? (
         <div className="hp-loading"><div className="hp-spinner"/><span>Chargement…</span></div>
       ) : hotels.length === 0 ? (
-        <div className="hp-empty"><span>🏨</span><p>Aucun hôtel trouvé.</p>{tab==='all' && <button className="hp-btn hp-btn--primary" onClick={() => setModal({})}><PlusIcon/> Créer</button>}</div>
+        <div className="hp-empty"><span>🏨</span><p>Aucun hôtel trouvé.</p>{tab==='all' && isAdmin && <button className="hp-btn hp-btn--primary" onClick={() => setModal({})}><PlusIcon/> Créer</button>}</div>
       ) : (
-        <div className="hp-grid">{hotels.map(h => <HotelCard key={h.id} hotel={h} onEdit={(hotel) => setModal({ hotel })} onView={setViewHotel} onDelete={handleDelete} deleting={deletingId === h.id} />)}</div>
+        <div className="hp-carousel-shell">
+          <button
+            type="button"
+            className="hp-carousel-arrow hp-carousel-arrow--prev"
+            aria-label="Faire défiler vers la gauche"
+            onClick={() => scrollHotelCarousel(-1)}
+          >
+            ‹
+          </button>
+          <div className="hp-carousel-track">
+            <div
+              className="hp-carousel"
+              ref={carouselRef}
+              onScroll={onHotelCarouselScroll}
+            >
+              {hotels.map((h) => (
+                <HotelCard
+                  key={h.id}
+                  hotel={h}
+                  isAdmin={isAdmin}
+                  onEdit={(hotel) => setModal({ hotel })}
+                  onView={setViewHotel}
+                  onDelete={handleDelete}
+                  onReserve={goReserveHotel}
+                  deleting={deletingId === h.id}
+                />
+              ))}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="hp-carousel-arrow hp-carousel-arrow--next"
+            aria-label="Faire défiler vers la droite"
+            onClick={() => scrollHotelCarousel(1)}
+          >
+            ›
+          </button>
+          {hotelCarouselDotCount > 1 && (
+            <div
+              className={`hp-carousel-dots${hotelCarouselDotCount > 10 ? ' hp-carousel-dots--many' : ''}`}
+              role="tablist"
+              aria-label="Pages du carrousel"
+            >
+              {Array.from({ length: hotelCarouselDotCount }, (_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  role="tab"
+                  aria-selected={carouselDot === i}
+                  aria-label={`Page ${i + 1} sur ${hotelCarouselDotCount}`}
+                  className={`hp-carousel-dot${carouselDot === i ? ' hp-carousel-dot--active' : ''}`}
+                  onClick={() => scrollHotelCarouselToDot(i)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   )

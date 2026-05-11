@@ -35,3 +35,9 @@ npm-debug.log*
 # ── OS ────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+
+# ── Local / generated ─────────────────────────────────
+.claude/
+back/uploads/
+# DB export copy (canonical: RAG/skyres_db.json at repo root)
+back/src/main/resources/rag/skyres_db.json

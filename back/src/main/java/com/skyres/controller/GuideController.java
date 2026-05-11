@@ -8,6 +8,7 @@ import com.skyres.service.GuideService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -31,16 +32,19 @@ public class GuideController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public Guide create(@RequestBody GuideRequest request) {
         return guideService.create(request);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public Guide update(@PathVariable Long id, @RequestBody GuideRequest request) {
         return guideService.update(id, request);
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         guideService.delete(id);
         return ResponseEntity.noContent().build();
@@ -52,6 +56,7 @@ public class GuideController {
     }
 
     @PostMapping("/{id}/reviews")
+    @PreAuthorize("isAuthenticated()")
     public Review addReview(@PathVariable Long id, @RequestBody ReviewRequest request) {
         return guideService.addReview(id, request);
     }

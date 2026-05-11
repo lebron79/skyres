@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { apiFetch, apiFetchPublic } from '../services/api'
@@ -91,6 +91,26 @@ const heroCards = [
 
 const DEST_FALLBACK_COLORS = ['#1a5276', '#7d6608', '#7b241c', '#154360', '#6e2f1a', '#1d4e1d', '#0e6655', '#4a235a']
 
+function formatBookingEur(n) {
+  if (n == null || !Number.isFinite(Number(n))) return '—'
+  return new Intl.NumberFormat('en-IE', {
+    style: 'currency',
+    currency: 'EUR',
+    maximumFractionDigits: 2,
+  }).format(Number(n))
+}
+
+function formatBookedAt(iso) {
+  if (!iso) return null
+  try {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return null
+    return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+  } catch {
+    return null
+  }
+}
+
 function mapDestinationForHome(dest, idx) {
   const starsRaw = dest.averageRating != null ? Number(dest.averageRating) : 5
   const stars = Number.isFinite(starsRaw)
@@ -115,8 +135,16 @@ function mapDestinationForHome(dest, idx) {
 
 const guideTopColors = ['#0C7A6E', '#1565c0', '#6a1b9a', '#b45309', '#0d9488', '#1e40af']
 
+function scrollCarousel(el, direction) {
+  if (!el) return
+  const step = Math.max(240, Math.round(el.clientWidth * 0.72))
+  el.scrollBy({ left: step * direction, behavior: 'smooth' })
+}
+
 export function HomePage() {
   const navigate = useNavigate()
+  const guidesCarouselRef = useRef(null)
+  const activitiesCarouselRef = useRef(null)
   const [search, setSearch] = useState('')
   const { user, token, isAuthenticated } = useAuth()
   const [destinations, setDestinations] = useState([])
@@ -246,6 +274,16 @@ export function HomePage() {
       .catch(() => setMyBookings([]))
       .finally(() => setBookingsLoading(false))
   }, [isAuthenticated, token, user])
+  const bookingsUpcomingCount = useMemo(() => {
+    if (!myBookings.length) return 0
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return myBookings.filter((b) => {
+      if (!b.checkOut) return false
+      const out = new Date(`${String(b.checkOut).slice(0, 10)}T12:00:00`)
+      return !Number.isNaN(out.getTime()) && out >= today
+    }).length
+  }, [myBookings])
   useEffect(() => {
     const loadStories = async () => {
       setStoriesLoading(true)
@@ -376,6 +414,7 @@ export function HomePage() {
       kind: 'activity',
       title: a.name,
       subtitle: a.location,
+      previewImage: a.img || null,
       description: a.description || 'No activity description available yet.',
       tags: [
         a.type ? `Type: ${a.type}` : null,
@@ -393,6 +432,8 @@ export function HomePage() {
     const first = g.user?.firstName ?? ''
     const last = g.user?.lastName ?? ''
     const displayName = `${first} ${last}`.trim() || `Guide #${g.id}`
+    const initials = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'G'
+    const photoUrl = (g.user?.photoUrl || '').trim()
     const rate =
       g.hourlyRate != null && Number.isFinite(Number(g.hourlyRate))
         ? `$${g.hourlyRate}/hr`
@@ -401,6 +442,9 @@ export function HomePage() {
       kind: 'guide',
       title: displayName,
       subtitle: g.region || 'Guide profile',
+      previewImage: photoUrl || null,
+      previewInitials: photoUrl ? null : initials,
+      previewAccent: guideTopColors[Number(g.id) % guideTopColors.length],
       description:
         g.user?.bio ||
         'Professional local guide ready to help you discover the destination.',
@@ -493,58 +537,207 @@ export function HomePage() {
 
       {/* ── My Bookings (tourist only) ── */}
       {isAuthenticated && user?.role === 'TOURIST' && (
-        <section className="section" style={{ paddingTop: '2rem', paddingBottom: '2rem' }}>
+        <section
+          id="account-bookings"
+          className={`section home-bookings-section${!bookingsLoading && myBookings.length > 0 ? ' home-bookings-section--populated' : ''}`}
+        >
           <div className="container">
-            <div className="section-header">
-              <div className="section-label">Your account</div>
-              <h2 className="section-heading">My bookings</h2>
+            <div className="home-bookings-intro">
+              <div className="home-bookings-intro-badge" aria-hidden>
+                🧳
+              </div>
+              <div className="home-bookings-intro-copy">
+                <div className="section-label">Your account</div>
+                <h2 className="section-heading home-bookings-title">
+                  My bookings
+                  {!bookingsLoading && myBookings.length > 0 && (
+                    <span className="home-bookings-count-badge">{myBookings.length}</span>
+                  )}
+                </h2>
+                <p className="section-body home-bookings-lead">
+                  Upcoming and past stays. Amounts are shown in euros (EUR), aligned with checkout.
+                </p>
+                {!bookingsLoading && myBookings.length > 0 && (
+                  <div className="home-bookings-quick-stats" role="status" aria-live="polite">
+                    <span className="home-bookings-quick-stat home-bookings-quick-stat--accent">
+                      <strong>{bookingsUpcomingCount}</strong>
+                      <span>upcoming stays</span>
+                    </span>
+                    <span className="home-bookings-quick-stat">
+                      <strong>{myBookings.length - bookingsUpcomingCount}</strong>
+                      <span>past stays</span>
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
-            {bookingsLoading && <p className="guides-status">Loading your bookings…</p>}
+
+            {bookingsLoading && (
+              <p className="home-bookings-loading">
+                <span className="home-bookings-loading-dot" aria-hidden />
+                Loading your bookings…
+              </p>
+            )}
             {!bookingsLoading && myBookings.length === 0 && (
-              <p className="guides-status">You have no bookings yet. Explore destinations below!</p>
+              <div className="home-bookings-empty">
+                <span className="home-bookings-empty-icon" aria-hidden>
+                  ✈️
+                </span>
+                <p>You have no bookings yet.</p>
+                <Link to="/destinations" className="home-bookings-empty-link">
+                  Explore destinations →
+                </Link>
+              </div>
             )}
             {!bookingsLoading && myBookings.length > 0 && (
               <div className="bookings-grid">
-                {myBookings.map(b => {
-                  const statusColor = {
-                    CONFIRMED: '#0d9488', PENDING: '#b45309', CANCELLED: '#dc2626',
-                  }[b.status] || '#6b7280'
-                  const nights = b.checkIn && b.checkOut
-                    ? Math.max(1, Math.round((new Date(b.checkOut) - new Date(b.checkIn)) / 86400000))
-                    : null
+                {myBookings.map((b) => {
+                  const statusKey = String(b.status || '').toUpperCase()
+                  const statusClass = {
+                    CONFIRMED: 'booking-status--ok',
+                    PENDING: 'booking-status--pending',
+                    CANCELLED: 'booking-status--bad',
+                  }[statusKey] || 'booking-status--muted'
+                  const nights =
+                    b.checkIn && b.checkOut
+                      ? Math.max(
+                          1,
+                          Math.round(
+                            (new Date(`${b.checkOut}T12:00:00`) - new Date(`${b.checkIn}T12:00:00`)) /
+                              86400000
+                          )
+                        )
+                      : null
+                  const inFmt = (d) =>
+                    d
+                      ? new Date(`${d}T12:00:00`).toLocaleDateString(undefined, {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })
+                      : '—'
+                  const destLine = [
+                    b.destinationCity ?? b.hotel?.destination?.city,
+                    b.destinationCountry ?? b.hotel?.destination?.country,
+                  ]
+                    .filter(Boolean)
+                    .join(', ')
+                  const bookedAtLabel = formatBookedAt(b.createdAt)
+                  const hotelTitle = b.hotelName ?? b.hotel?.name ?? 'Hotel'
+                  const initials = initialsFromName(hotelTitle)
                   return (
-                    <div key={b.id} className="booking-card">
-                      <div className="booking-header">
-                        <div>
-                          <div className="booking-hotel">{b.hotelName ?? b.hotel?.name ?? 'Hotel'}</div>
-                          <div className="booking-dest">
-                            {b.destinationCity ?? b.hotel?.destination?.city ?? ''}
-                            {(b.destinationCity ?? b.hotel?.destination?.city) &&
-                            (b.destinationCountry ?? b.hotel?.destination?.country)
-                              ? ', '
-                              : ''}
-                            {b.destinationCountry ?? b.hotel?.destination?.country ?? ''}
+                    <article key={b.id} className="booking-card">
+                      <div className="booking-card-accent" aria-hidden />
+                      <div className="booking-card-top">
+                        <div className="booking-card-brand">
+                          <div className="booking-card-avatar" aria-hidden>
+                            {initials}
+                          </div>
+                          <div className="booking-card-titles">
+                            <h3 className="booking-hotel">{hotelTitle}</h3>
+                            {destLine ? (
+                              <p className="booking-dest">
+                                <span className="booking-dest-pin" aria-hidden>
+                                  📍
+                                </span>
+                                {destLine}
+                              </p>
+                            ) : null}
+                            {bookedAtLabel ? (
+                              <p className="booking-booked-on">
+                                <span aria-hidden>🗓️</span> Booked {bookedAtLabel}
+                              </p>
+                            ) : null}
                           </div>
                         </div>
-                        <span className="booking-status" style={{ background: statusColor }}>{b.status}</span>
+                        <span className={`booking-status ${statusClass}`}>{statusKey || '—'}</span>
                       </div>
-                      <div className="booking-dates">
-                        {b.checkIn && <span>Check-in: <strong>{new Date(b.checkIn).toLocaleDateString()}</strong></span>}
-                        {b.checkOut && <span>Check-out: <strong>{new Date(b.checkOut).toLocaleDateString()}</strong></span>}
-                        {nights && <span>{nights} night{nights > 1 ? 's' : ''}</span>}
-                      </div>
+                      <dl className="booking-meta">
+                        <div className="booking-meta-cell">
+                          <dt>
+                            <span className="booking-meta-ico" aria-hidden>
+                              📅
+                            </span>
+                            Check-in
+                          </dt>
+                          <dd>{inFmt(b.checkIn)}</dd>
+                        </div>
+                        <div className="booking-meta-cell">
+                          <dt>
+                            <span className="booking-meta-ico" aria-hidden>
+                              📆
+                            </span>
+                            Check-out
+                          </dt>
+                          <dd>{inFmt(b.checkOut)}</dd>
+                        </div>
+                        <div className="booking-meta-cell">
+                          <dt>
+                            <span className="booking-meta-ico" aria-hidden>
+                              🌙
+                            </span>
+                            Stay
+                          </dt>
+                          <dd>
+                            {nights != null ? (
+                              <>
+                                {nights} night{nights !== 1 ? 's' : ''}
+                              </>
+                            ) : (
+                              '—'
+                            )}
+                          </dd>
+                        </div>
+                      </dl>
                       {b.totalPrice != null && (
-                        <div className="booking-price">Total: <strong>${Number(b.totalPrice).toFixed(2)}</strong></div>
+                        <div className="booking-price-row">
+                          <span className="booking-price-label">Total</span>
+                          <span className="booking-price-value">{formatBookingEur(b.totalPrice)}</span>
+                        </div>
                       )}
-                    </div>
+                      {statusKey === 'CANCELLED' && (
+                        <div className="booking-remove-row">
+                          <button
+                            type="button"
+                            className="booking-remove-btn"
+                            onClick={async () => {
+                              if (
+                                !window.confirm(
+                                  'Remove this cancelled reservation from your list permanently?'
+                                )
+                              )
+                                return
+                              try {
+                                await apiFetch(`/api/reservations/${b.id}`, { method: 'DELETE' }, token)
+                                setMyBookings((prev) => prev.filter((x) => x.id !== b.id))
+                              } catch (err) {
+                                alert(err.message || 'Could not remove reservation.')
+                              }
+                            }}
+                          >
+                            Remove from list
+                          </button>
+                        </div>
+                      )}
+                    </article>
                   )
                 })}
               </div>
             )}
-            <div style={{ marginTop: '1rem' }}>
-              <button type="button" className="search-btn" style={{ fontSize: '0.85rem', padding: '8px 18px' }}
-                onClick={() => navigate('/reservations')}>
+            <div className="home-bookings-actions">
+              <button
+                type="button"
+                className="home-bookings-cta"
+                onClick={() => navigate('/reservations')}
+              >
                 Manage all reservations →
+              </button>
+              <button
+                type="button"
+                className="home-bookings-cta home-bookings-cta--ghost"
+                onClick={() => navigate('/payments')}
+              >
+                Payment history →
               </button>
             </div>
           </div>
@@ -627,68 +820,102 @@ export function HomePage() {
           {!guidesLoading && sortedGuides.length === 0 && (
             <p className="guides-status">No guides are listed yet. Check back soon.</p>
           )}
-          <div className="guide-grid">
-            {!guidesLoading &&
-              sortedGuides.map((g, idx) => {
-                const first = g.user?.firstName ?? ''
-                const last = g.user?.lastName ?? ''
-                const initials = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'G'
-                const displayName = `${first} ${last}`.trim() || `Guide #${g.id}`
-                const rate =
-                  g.hourlyRate != null && Number.isFinite(Number(g.hourlyRate))
-                    ? `$${g.hourlyRate}/hr`
-                    : 'Rate on request'
-                const rating =
-                  g.averageRating != null && Number(g.averageRating) > 0
-                    ? Number(g.averageRating).toFixed(1)
-                    : null
-                const topColor = guideTopColors[idx % guideTopColors.length]
-                return (
-                  <button
-                    key={g.id}
-                    className={`guide-card${g.available ? '' : ' guide-card-unavailable'}`}
-                    type="button"
-                    onClick={() => openGuideDetails(g)}
-                  >
-                    <div
-                      className="guide-card-top"
-                      style={{
-                        background: `linear-gradient(135deg, ${topColor} 0%, #1a1714 100%)`,
-                      }}
+          {!guidesLoading && sortedGuides.length > 0 && (
+            <div className="home-carousel-row" aria-label="Guides carousel">
+              <button
+                type="button"
+                className="home-carousel-arrow"
+                aria-label="Scroll guides left"
+                onClick={() => scrollCarousel(guidesCarouselRef.current, -1)}
+              >
+                ‹
+              </button>
+              <div className="home-carousel" ref={guidesCarouselRef}>
+                {sortedGuides.map((g, idx) => {
+                  const first = g.user?.firstName ?? ''
+                  const last = g.user?.lastName ?? ''
+                  const initials = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'G'
+                  const displayName = `${first} ${last}`.trim() || `Guide #${g.id}`
+                  const rate =
+                    g.hourlyRate != null && Number.isFinite(Number(g.hourlyRate))
+                      ? `$${g.hourlyRate}/hr`
+                      : 'Rate on request'
+                  const rating =
+                    g.averageRating != null && Number(g.averageRating) > 0
+                      ? Number(g.averageRating).toFixed(1)
+                      : null
+                  const topColor = guideTopColors[idx % guideTopColors.length]
+                  const photoUrl = (g.user?.photoUrl || '').trim()
+                  const hasPhoto = Boolean(photoUrl)
+                  return (
+                    <button
+                      key={g.id}
+                      className={`guide-card${g.available ? '' : ' guide-card-unavailable'}`}
+                      type="button"
+                      onClick={() => openGuideDetails(g)}
                     >
-                      <div className="guide-avatar" aria-hidden>
-                        {initials}
-                      </div>
-                      <span className={`guide-pill${g.available ? ' guide-pill-on' : ''}`}>
-                        {g.available ? 'Available' : 'Unavailable'}
-                      </span>
-                    </div>
-                    <div className="guide-body">
-                      <div className="guide-name">{displayName}</div>
-                      <div className="guide-meta">
-                        {g.region && <span>📍 {g.region}</span>}
-                        {g.languages && <span>🗣 {g.languages}</span>}
-                      </div>
-                      <div className="guide-row">
-                        <span className="guide-rate">{rate}</span>
-                        {rating && <span className="guide-stars">★ {rating}</span>}
-                      </div>
-                      <button
-                        type="button"
-                        className="guide-btn"
-                        disabled={!g.available}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          goToGuidePayment(g)
-                        }}
+                      <div
+                        className={`guide-card-top${hasPhoto ? ' guide-card-top--image' : ''}`}
+                        style={
+                          hasPhoto
+                            ? undefined
+                            : { background: `linear-gradient(135deg, ${topColor} 0%, #1a1714 100%)` }
+                        }
                       >
-                        Book session
-                      </button>
-                    </div>
-                  </button>
-                )
-              })}
-          </div>
+                        {hasPhoto && (
+                          <img
+                            className="guide-card-cover-img"
+                            src={photoUrl}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        )}
+                        {!hasPhoto && (
+                          <div className="guide-avatar" aria-hidden>
+                            {initials}
+                          </div>
+                        )}
+                        <span className={`guide-pill${g.available ? ' guide-pill-on' : ''}`}>
+                          {g.available ? 'Available' : 'Unavailable'}
+                        </span>
+                      </div>
+                      <div className="guide-body">
+                        <div className="guide-name">{displayName}</div>
+                        <div className="guide-meta">
+                          {g.region && <span>📍 {g.region}</span>}
+                          {g.languages && <span>🗣 {g.languages}</span>}
+                        </div>
+                        <div className="guide-row">
+                          <span className="guide-rate">{rate}</span>
+                          {rating && <span className="guide-stars">★ {rating}</span>}
+                        </div>
+                        <button
+                          type="button"
+                          className="guide-btn"
+                          disabled={!g.available}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            goToGuidePayment(g)
+                          }}
+                        >
+                          Book session
+                        </button>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+              <button
+                type="button"
+                className="home-carousel-arrow"
+                aria-label="Scroll guides right"
+                onClick={() => scrollCarousel(guidesCarouselRef.current, 1)}
+              >
+                ›
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -705,45 +932,67 @@ export function HomePage() {
               Cappadocia — curated experiences for every type of traveller.
             </p>
           </div>
-          <div className="act-grid">
-            {activitiesLoading && <p className="guides-status">Loading activities...</p>}
-            {activities.map(a => (
-              <article
-                key={a.id}
-                className="act-card"
-                onClick={() => openActivityDetails(a)}
+          {activitiesLoading && <p className="guides-status">Loading activities...</p>}
+          {!activitiesLoading && activities.length > 0 && (
+            <div className="home-carousel-row" aria-label="Activities carousel">
+              <button
+                type="button"
+                className="home-carousel-arrow"
+                aria-label="Scroll activities left"
+                onClick={() => scrollCarousel(activitiesCarouselRef.current, -1)}
               >
-                <div
-                  className="act-photo"
-                  style={{
-                    backgroundImage: `url(${a.img})`,
-                    backgroundColor: a.fallback,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                  }}
-                >
-                  <div className="act-price">{a.price}</div>
-                </div>
-                <div className="act-body">
-                  <div className="act-name">{a.name}</div>
-                  <div className="act-meta">
-                    <span>📍 {a.location}</span>
-                    <span>⏱ {a.duration}</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="act-btn"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      goToActivityPayment(a)
-                    }}
+                ‹
+              </button>
+              <div className="home-carousel" ref={activitiesCarouselRef}>
+                {activities.map((a) => (
+                  <article
+                    key={a.id}
+                    className="act-card"
+                    onClick={() => openActivityDetails(a)}
                   >
-                    Book experience
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
+                    <div
+                      className="act-photo"
+                      style={{ backgroundColor: a.fallback }}
+                    >
+                      <img
+                        className="act-photo-img"
+                        src={a.img}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                      />
+                      <div className="act-price">{a.price}</div>
+                    </div>
+                    <div className="act-body">
+                      <div className="act-name">{a.name}</div>
+                      <div className="act-meta">
+                        <span>📍 {a.location}</span>
+                        <span>⏱ {a.duration}</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="act-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          goToActivityPayment(a)
+                        }}
+                      >
+                        Book experience
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="home-carousel-arrow"
+                aria-label="Scroll activities right"
+                onClick={() => scrollCarousel(activitiesCarouselRef.current, 1)}
+              >
+                ›
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -1022,7 +1271,7 @@ export function HomePage() {
       {detailModal && (
         <div className="details-modal-backdrop" role="presentation" onClick={() => setDetailModal(null)}>
           <div
-            className="details-modal"
+            className={`details-modal${detailModal.previewImage || detailModal.previewInitials ? '' : ' details-modal--no-hero'}`}
             role="dialog"
             aria-modal="true"
             aria-label={detailModal.title}
@@ -1036,33 +1285,58 @@ export function HomePage() {
             >
               ✕
             </button>
-            <p className="details-modal-kicker">{detailModal.kind}</p>
-            <h3 className="details-modal-title">{detailModal.title}</h3>
-            {detailModal.subtitle && <p className="details-modal-subtitle">{detailModal.subtitle}</p>}
-            <p className="details-modal-description">{detailModal.description}</p>
-            {detailModal.tags?.length > 0 && (
-              <div className="details-modal-tags">
-                {detailModal.tags.map((tag) => (
-                  <span key={tag} className="details-modal-tag">{tag}</span>
-                ))}
+            {(detailModal.previewImage || detailModal.previewInitials) && (
+              <div className="details-modal-hero-wrap">
+                {detailModal.previewImage ? (
+                  <img
+                    className="details-modal-hero-img"
+                    src={detailModal.previewImage}
+                    alt={detailModal.title || 'Preview'}
+                    loading="eager"
+                    decoding="async"
+                  />
+                ) : (
+                  <div
+                    className="details-modal-hero-fallback"
+                    style={{
+                      background: `linear-gradient(135deg, ${detailModal.previewAccent} 0%, #1a1714 100%)`,
+                    }}
+                    aria-hidden
+                  >
+                    <span className="details-modal-hero-initials">{detailModal.previewInitials}</span>
+                  </div>
+                )}
               </div>
             )}
-            <div className="details-modal-actions">
-              <button type="button" className="dest-pill" onClick={() => setDetailModal(null)}>
-                Close
-              </button>
-              {detailModal.primaryLabel && detailModal.onPrimary && (
-                <button
-                  type="button"
-                  className="act-btn"
-                  onClick={() => {
-                    detailModal.onPrimary()
-                    setDetailModal(null)
-                  }}
-                >
-                  {detailModal.primaryLabel}
-                </button>
+            <div className="details-modal-body">
+              <p className="details-modal-kicker">{detailModal.kind}</p>
+              <h3 className="details-modal-title">{detailModal.title}</h3>
+              {detailModal.subtitle && <p className="details-modal-subtitle">{detailModal.subtitle}</p>}
+              <p className="details-modal-description">{detailModal.description}</p>
+              {detailModal.tags?.length > 0 && (
+                <div className="details-modal-tags">
+                  {detailModal.tags.map((tag) => (
+                    <span key={tag} className="details-modal-tag">{tag}</span>
+                  ))}
+                </div>
               )}
+              <div className="details-modal-actions">
+                <button type="button" className="dest-pill" onClick={() => setDetailModal(null)}>
+                  Close
+                </button>
+                {detailModal.primaryLabel && detailModal.onPrimary && (
+                  <button
+                    type="button"
+                    className="act-btn"
+                    onClick={() => {
+                      detailModal.onPrimary()
+                      setDetailModal(null)
+                    }}
+                  >
+                    {detailModal.primaryLabel}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

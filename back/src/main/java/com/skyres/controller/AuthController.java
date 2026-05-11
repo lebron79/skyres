@@ -5,6 +5,7 @@ import com.skyres.dto.request.RegisterRequest;
 import com.skyres.dto.response.AuthResponse;
 import com.skyres.model.entity.User;
 import com.skyres.model.enums.Role;
+import com.skyres.repository.ReservationRepository;
 import com.skyres.repository.UserRepository;
 import com.skyres.security.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final UserRepository userRepository;
+    private final ReservationRepository reservationRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authManager;
     private final UserDetailsService userDetailsService;
@@ -63,6 +65,7 @@ public class AuthController {
                 .bio(user.getBio())
                 .role(user.getRole().name())
                 .createdAt(user.getCreatedAt())
+                .reservationCount(0L)
                 .build());
     }
 
@@ -76,6 +79,7 @@ public class AuthController {
         String token = jwtUtil.generateToken(userDetails);
 
         User user = userRepository.findByEmail(request.getEmail()).orElseThrow();
+        long rc = reservationRepository.countByUser_Id(user.getId());
         return ResponseEntity.ok(AuthResponse.builder()
                 .token(token)
                 .id(user.getId())
@@ -87,6 +91,7 @@ public class AuthController {
                 .bio(user.getBio())
                 .role(user.getRole().name())
                 .createdAt(user.getCreatedAt())
+                .reservationCount(rc)
                 .build());
     }
 }

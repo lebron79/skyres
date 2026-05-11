@@ -1,6 +1,8 @@
 package com.skyres.service;
 
+import com.skyres.dto.request.ChatbotRequest;
 import com.skyres.dto.request.RecommendationRequest;
+import com.skyres.dto.response.ChatbotResponse;
 import com.skyres.model.entity.Activity;
 import com.skyres.repository.ActivityRepository;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +17,7 @@ import java.util.List;
 public class IntelligenceService {
 
     private final ActivityRepository activityRepository;
+    private final GroqRagChatService groqRagChatService;
 
     public List<Activity> recommendActivities(RecommendationRequest request) {
         List<Activity> activities = new ArrayList<>(activityRepository.findAll());
@@ -61,11 +64,7 @@ public class IntelligenceService {
         return plan;
     }
 
-    public String chatbotReply(String message) {
-        if (message == null || message.isBlank()) {
-            return "Hello! Tell me your budget, season, and preferences to suggest activities.";
-        }
-        return "Tourism Bot: I can help with guides, activities, and travel plans. "
-                + "Try asking: 'Suggest activities for summer with budget 100'.";
+    public ChatbotResponse ragChat(ChatbotRequest request) {
+        return groqRagChatService.chat(request);
     }
 }

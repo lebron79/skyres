@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function UserMenu({ onSettingsClick }) {
@@ -43,6 +44,13 @@ export default function UserMenu({ onSettingsClick }) {
             </div>
           </div>
           <div className="user-menu-divider" />
+          <Link className="user-menu-item" to="/payments" onClick={() => setIsOpen(false)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="2" y="5" width="20" height="14" rx="2" />
+              <line x1="2" y1="10" x2="22" y2="10" />
+            </svg>
+            Payment history
+          </Link>
           <button className="user-menu-item" onClick={() => { onSettingsClick?.(); setIsOpen(false); }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="1"></circle>
@@ -124,6 +132,12 @@ export default function UserMenu({ onSettingsClick }) {
           overflow: hidden;
         }
 
+        .user-avatar:has(img) {
+          background: #fff;
+          border: 1px solid rgba(0, 0, 0, 0.08);
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+        }
+
         .user-avatar img {
           width: 100%;
           height: 100%;
@@ -162,6 +176,8 @@ export default function UserMenu({ onSettingsClick }) {
           text-align: left;
           transition: background 0.2s;
           font-size: 0.9rem;
+          text-decoration: none;
+          box-sizing: border-box;
         }
 
         .user-menu-item:hover {
@@ -190,6 +206,12 @@ export default function UserMenu({ onSettingsClick }) {
           font-size: 0.95rem;
           flex-shrink: 0;
           overflow: hidden;
+        }
+
+        .user-avatar-lg:has(img) {
+          background: #fff;
+          border: 1px solid rgba(0, 0, 0, 0.08);
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
         }
 
         .user-avatar-lg img {

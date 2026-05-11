@@ -406,6 +406,10 @@
   align-items: flex-end;
 }
 
+.admin-ai-row .admin-btn-ai {
+  flex-shrink: 0;
+}
+
 .admin-ai-label {
   flex: 1;
   min-width: 180px;
@@ -652,10 +656,12 @@
 .admin-table tbody tr:hover { background: rgba(12, 122, 110, 0.025); }
 
 .admin-actions {
-  white-space: nowrap;
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
+  max-width: 220px;
+  justify-content: flex-end;
 }
 
 /* Legacy link buttons (kept for compatibility but hidden under new styles) */

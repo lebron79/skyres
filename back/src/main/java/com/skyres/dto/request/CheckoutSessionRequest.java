@@ -13,7 +13,7 @@ import java.math.BigDecimal;
 public class CheckoutSessionRequest {
 
     @NotBlank
-    @Pattern(regexp = "activity|guide", flags = Pattern.Flag.CASE_INSENSITIVE, message = "type must be activity or guide")
+    @Pattern(regexp = "activity|guide|reservation", flags = Pattern.Flag.CASE_INSENSITIVE, message = "type must be activity, guide, or reservation")
     private String type;
 
     /** Display / catalogue reference (activity id, guide id, etc.) */
@@ -24,8 +24,8 @@ public class CheckoutSessionRequest {
     @Size(max = 200)
     private String name;
 
-    /** Total or unit price in USD (Stripe minimum ~$0.50). */
+    /** Total or unit price in EUR (Stripe minimum €0.50). */
     @NotNull
-    @DecimalMin(value = "0.5", message = "amountUsd must be at least 0.5")
-    private BigDecimal amountUsd;
+    @DecimalMin(value = "0.5", message = "amountEur must be at least 0.50")
+    private BigDecimal amountEur;
 }

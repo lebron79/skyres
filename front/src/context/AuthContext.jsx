@@ -76,7 +76,8 @@ export const AuthProvider = ({ children }) => {
         photoUrl: data.photoUrl,
         bio: data.bio,
         role: data.role,
-        createdAt: data.createdAt
+        createdAt: data.createdAt,
+        reservationCount: data.reservationCount ?? 0,
       });
       localStorage.setItem('authToken', data.token);
       return data;
@@ -111,7 +112,8 @@ export const AuthProvider = ({ children }) => {
         photoUrl: data.photoUrl,
         bio: data.bio,
         role: data.role,
-        createdAt: data.createdAt
+        createdAt: data.createdAt,
+        reservationCount: data.reservationCount ?? 0,
       });
       localStorage.setItem('authToken', data.token);
       return data;
@@ -153,8 +155,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const changePassword = async (userId, currentPassword, newPassword) => {
-    if (!token) throw new Error('Not authenticated');
-    
+    if (!token) throw new Error('Not authenticated')
+
     try {
       const res = await fetch(`${API_BASE}/api/users/${userId}/change-password`, {
         method: 'POST',
@@ -163,15 +165,28 @@ export const AuthProvider = ({ children }) => {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ currentPassword, newPassword }),
-      });
+      })
 
-      if (!res.ok) throw new Error('Password change failed');
-      return true;
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        let msg = text?.trim() || `Password change failed (${res.status})`
+        if (text && text.startsWith('{')) {
+          try {
+            const obj = JSON.parse(text)
+            const first = Object.values(obj)[0]
+            if (typeof first === 'string') msg = first
+          } catch {
+            /* keep msg */
+          }
+        }
+        throw new Error(msg)
+      }
+      return true
     } catch (err) {
-      setError(err.message);
-      throw err;
+      setError(err.message)
+      throw err
     }
-  };
+  }
 
   return (
     <AuthContext.Provider

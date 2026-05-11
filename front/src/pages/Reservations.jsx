@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useTripCart, nightsBetweenStr } from '../context/TripCartContext.jsx'
+import { priceMultiplier } from '../utils/skyresCoupons.js'
+import CouponScratchCard from '../components/CouponScratchCard.jsx'
 import { apiFetch } from '../services/api.js'
 import './Reservations.css'
 
@@ -15,14 +18,60 @@ const AMENITIES = [
   { key: 'bar',            label: '🍹 Bar' },
 ]
 
-const PAYMENT_METHODS = [
-  { key: 'CARD',   label: 'Credit / Debit Card',  icon: '💳', desc: 'Visa, Mastercard, Amex' },
-  { key: 'PAYPAL', label: 'PayPal',                icon: '🅿️', desc: 'Pay with your PayPal account' },
-  { key: 'CASH',   label: 'Cash on arrival',       icon: '💵', desc: 'Pay at the hotel' },
-]
+/** Hotel nightly rate in DB is TND; destination estimatedBudget is EUR (same as backend). */
+const TND_PER_EUR = 3.42
+
+function hotelNightEur(pricePerNightTnd) {
+  const n = Number(pricePerNightTnd)
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return n / TND_PER_EUR
+}
+
+function destinationFeeEur(dest) {
+  if (!dest || dest.estimatedBudget == null) return 0
+  const v = Number(dest.estimatedBudget)
+  return Number.isFinite(v) && v > 0 ? v : 0
+}
+
+function formatEur(n) {
+  if (n == null || !Number.isFinite(Number(n))) return '—'
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'EUR',
+    maximumFractionDigits: 2,
+  }).format(Number(n))
+}
+
+/** When the reservation was created (booking placed). */
+function formatReservationBookedAt(iso) {
+  if (!iso) return null
+  try {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return null
+    return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+  } catch {
+    return null
+  }
+}
 
 export default function Reservations() {
   const { user, token } = useAuth()
+  const {
+    appliedCoupons,
+    applyCoupon,
+    removeCoupon,
+    maxCouponSlots,
+    checkIn,
+    setCheckIn,
+    checkOut,
+    setCheckOut,
+    persons,
+    setPersons,
+    setTripHotel,
+    resetStayDates,
+    resetBookingWizard,
+  } = useTripCart()
+  const [searchParams] = useSearchParams()
 
   const [reservations, setReservations]     = useState([])
   const [hotels, setHotels]                 = useState([])
@@ -37,31 +86,127 @@ export default function Reservations() {
     spa: false, airportShuttle: false, fitnessCenter: false, bar: false,
   })
 
-  const [form, setForm] = useState({
-    checkIn: '', checkOut: '', numberOfPersons: 1, couponCode: '',
-  })
-
-  const [paymentMethod, setPaymentMethod]   = useState('CARD')
-  const [paymentLoading, setPaymentLoading] = useState(false)
-  const [paymentDone, setPaymentDone]       = useState(null) // payment response
-
   const [showBudget, setShowBudget]   = useState(false)
   const [budgetHotel, setBudgetHotel] = useState(null)
-  const [budgetForm, setBudgetForm]   = useState({ checkIn: '', checkOut: '', numberOfPersons: 1, couponCode: '' })
+  const [budgetForm, setBudgetForm]   = useState({ checkIn: '', checkOut: '', numberOfPersons: 1, couponCode: '', secondCouponCode: '' })
   const [budget, setBudget]           = useState(null)
 
-  const [step, setStep]       = useState('list') // list | search | book | payment | confirmed
+  const [step, setStep]       = useState('list') // list | search | book | payment
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
-  useEffect(() => { if (user) loadReservations() }, [user])
-
-  const loadReservations = async () => {
+  const bookingEstimateEur = useMemo(() => {
+    if (step !== 'book' || !selectedHotel) return null
+    const n = nightsBetweenStr(checkIn, checkOut)
+    if (n <= 0) return null
+    const p = Math.max(1, persons)
+    const nightEur = hotelNightEur(selectedHotel.pricePerNight)
+    const hotelPart = nightEur * n * p
+    const destPart = destinationFeeEur(selectedHotel.destination)
+    const subtotal = hotelPart + destPart
+    const c1 = appliedCoupons[0] ?? ''
+    const c2 = appliedCoupons[1] ?? ''
+    let mult = 1
     try {
-      const data = await apiFetch(`/api/reservations/user/${user.id}`, {}, token)
+      mult = priceMultiplier(c1 || null, c2 || null, maxCouponSlots === 2)
+    } catch {
+      mult = 1
+    }
+    const totalEur = subtotal * mult
+    const discountEur = Math.max(0, subtotal - totalEur)
+    return {
+      nights: n,
+      persons: p,
+      hotelPart,
+      destPart,
+      subtotal,
+      totalEur,
+      discountEur,
+    }
+  }, [step, selectedHotel, checkIn, checkOut, persons, appliedCoupons, maxCouponSlots])
+
+  /** Single primitive so useEffect deps array length never changes (avoids Fast Refresh / hook mismatch warnings). */
+  const reservationsSessionKey = useMemo(() => {
+    const uid = user?.id
+    if (uid == null) return ''
+    const fromState = (token ?? '').trim()
+    const fromStorage =
+      typeof localStorage !== 'undefined' ? (localStorage.getItem('authToken') ?? '').trim() : ''
+    const auth = fromState || fromStorage
+    if (!auth) return ''
+    return `${uid}\t${auth}`
+  }, [user?.id, token])
+
+  useEffect(() => {
+    if (!reservationsSessionKey) return
+    const tab = reservationsSessionKey.indexOf('\t')
+    if (tab < 1) return
+    const userId = Number(reservationsSessionKey.slice(0, tab))
+    const auth = reservationsSessionKey.slice(tab + 1)
+    if (!Number.isFinite(userId) || !auth) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const data = await apiFetch(`/api/reservations/user/${userId}`, {}, auth)
+        if (!cancelled) setReservations(Array.isArray(data) ? data : [])
+      } catch {
+        if (!cancelled) setReservations([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [reservationsSessionKey])
+
+  useEffect(() => {
+    if (step !== 'book' || !selectedHotel?.id) return
+    setTripHotel({
+      id: selectedHotel.id,
+      name: selectedHotel.name,
+      pricePerNight: selectedHotel.pricePerNight,
+    })
+  }, [step, selectedHotel, setTripHotel])
+
+  const deepLinkHotelId = searchParams.get('hotelId')
+
+  // Deep link: /reservations?hotelId=123 → load hotel and open booking step
+  useEffect(() => {
+    if (!deepLinkHotelId || user?.id == null) return
+    const auth = (token ?? '').trim() || (typeof localStorage !== 'undefined' ? localStorage.getItem('authToken') : '')?.trim() ?? ''
+    if (!auth) return
+    const id = Number(deepLinkHotelId)
+    if (!Number.isFinite(id) || id < 1) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const hotel = await apiFetch(`/api/hotels/${id}`, {}, auth)
+        if (cancelled || !hotel?.id) return
+        resetStayDates()
+        setSelectedHotel(hotel)
+        setStep('book')
+        setMessage('')
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      } catch (err) {
+        if (!cancelled) setMessage(`✗ ${err.message}`)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [deepLinkHotelId, user?.id, token, resetStayDates])
+
+  const loadReservations = useCallback(async () => {
+    if (!reservationsSessionKey) return
+    const tab = reservationsSessionKey.indexOf('\t')
+    if (tab < 1) return
+    const userId = Number(reservationsSessionKey.slice(0, tab))
+    const auth = reservationsSessionKey.slice(tab + 1)
+    if (!Number.isFinite(userId) || !auth) return
+    try {
+      const data = await apiFetch(`/api/reservations/user/${userId}`, {}, auth)
       setReservations(Array.isArray(data) ? data : [])
-    } catch { setReservations([]) }
-  }
+    } catch {
+      setReservations([])
+    }
+  }, [reservationsSessionKey])
 
   const searchHotels = async (e) => {
     e?.preventDefault()
@@ -99,6 +244,7 @@ export default function Reservations() {
   }
 
   const selectHotel = (hotel) => {
+    resetStayDates()
     setSelectedHotel(hotel)
     setStep('book')
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -115,57 +261,19 @@ export default function Reservations() {
         body: JSON.stringify({
           userId: user.id,
           hotelId: selectedHotel.id,
-          checkIn: form.checkIn,
-          checkOut: form.checkOut,
-          numberOfPersons: Number(form.numberOfPersons),
-          couponCode: form.couponCode || null,
+          checkIn,
+          checkOut,
+          numberOfPersons: Number(persons),
+          couponCode: appliedCoupons[0] || null,
+          secondCouponCode: appliedCoupons[1] || null,
         }),
       }, token)
       setCreatedReservation(res)
-      setPaymentMethod('CARD')
-      setPaymentDone(null)
       setStep('payment')
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) { setMessage(`✗ ${err.message}`) }
     setLoading(false)
   }
-
-  // Step 2: pay
-  const handlePay = async () => {
-  if (!createdReservation) return
-
-  // PayPal — ouvre PayPal dans un nouvel onglet puis confirme
-  if (paymentMethod === 'PAYPAL') {
-    const confirmed = window.confirm(
-      `You will be redirected to PayPal to pay $${createdReservation.totalPrice?.toFixed(2)}.\n\nClick OK to proceed.`
-    )
-    if (!confirmed) return
-    window.open('https://www.paypal.com/checkoutnow', '_blank')
-    // simulate payment after redirect
-    const simulate = window.confirm(
-      'Have you completed the PayPal payment?\n\nClick OK to confirm your booking.'
-    )
-    if (!simulate) return
-  }
-
-  setPaymentLoading(true)
-  setMessage('')
-  try {
-    const payment = await apiFetch('/api/payments', {
-      method: 'POST',
-      body: JSON.stringify({
-        reservationId: createdReservation.id,
-        amount: createdReservation.totalPrice,
-        method: paymentMethod,
-      }),
-    }, token)
-    setPaymentDone(payment)
-    setStep('confirmed')
-    await loadReservations()
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  } catch (err) { setMessage(`✗ ${err.message}`) }
-  setPaymentLoading(false)
-}
 
   const handleCancel = async (id) => {
     if (!window.confirm('Cancel this reservation?')) return
@@ -174,6 +282,17 @@ export default function Reservations() {
       setMessage('✓ Reservation cancelled')
       await loadReservations()
     } catch (err) { setMessage(`✗ ${err.message}`) }
+  }
+
+  const handleDeleteCancelled = async (id) => {
+    if (!window.confirm('Remove this cancelled reservation from your list permanently?')) return
+    try {
+      await apiFetch(`/api/reservations/${id}`, { method: 'DELETE' }, token)
+      setMessage('✓ Reservation removed from your list')
+      await loadReservations()
+    } catch (err) {
+      setMessage(`✗ ${err.message}`)
+    }
   }
 
   const handlePdf = async (id) => {
@@ -206,6 +325,8 @@ export default function Reservations() {
           checkOut: budgetForm.checkOut,
           numberOfPersons: Number(budgetForm.numberOfPersons),
           couponCode: budgetForm.couponCode || null,
+          secondCouponCode: budgetForm.secondCouponCode?.trim() || null,
+          userId: user?.id ?? null,
         }),
       }, token)
       setBudget(data)
@@ -214,17 +335,25 @@ export default function Reservations() {
   }
 
   const openBudget = (hotel) => {
-    setBudgetHotel(hotel); setBudget(null)
-    setBudgetForm({ checkIn: '', checkOut: '', numberOfPersons: 1, couponCode: '' })
+    setBudgetHotel(hotel)
+    setBudget(null)
+    setBudgetForm({
+      checkIn: checkIn || '',
+      checkOut: checkOut || '',
+      numberOfPersons: persons,
+      couponCode: appliedCoupons[0] || '',
+      secondCouponCode: appliedCoupons[1] || '',
+    })
     setShowBudget(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const goHome = () => {
-    setStep('list'); setSelectedHotel(null)
-    setCreatedReservation(null); setPaymentDone(null)
-    setForm({ checkIn: '', checkOut: '', numberOfPersons: 1, couponCode: '' })
+    setStep('list')
+    setSelectedHotel(null)
+    setCreatedReservation(null)
     setMessage('')
+    resetBookingWizard()
   }
 
   const statusColor = (s) => ({
@@ -233,8 +362,6 @@ export default function Reservations() {
   }[s] || '#6b7280')
 
   const stars = (n) => '★'.repeat(n) + '☆'.repeat(5 - n)
-
-  const methodIcon = (m) => PAYMENT_METHODS.find(p => p.key === m)?.icon || '💳'
 
   // ── RENDER ──────────────────────────────────────────────────────────────────
   return (
@@ -246,12 +373,20 @@ export default function Reservations() {
       {/* Progress bar */}
       {step !== 'list' && (
         <div className="res-progress">
-          {['search', 'book', 'payment', 'confirmed'].map((s, i) => (
-            <div key={s} className={`res-progress-step ${step === s ? 'active' : ''} ${['book','payment','confirmed'].includes(step) && i === 0 ? 'done' : ''} ${['payment','confirmed'].includes(step) && i === 1 ? 'done' : ''} ${step === 'confirmed' && i === 2 ? 'done' : ''}`}>
-              <div className="res-progress-dot">{i + 1}</div>
-              <span>{['Search Hotel', 'Book', 'Payment', 'Confirmed'][i]}</span>
-            </div>
-          ))}
+          {(() => {
+            const wizardSteps = ['search', 'book', 'payment']
+            const labels = ['Search Hotel', 'Book', 'Payment']
+            const activeIdx = wizardSteps.indexOf(step)
+            return wizardSteps.map((s, i) => (
+              <div
+                key={s}
+                className={`res-progress-step ${step === s ? 'active' : ''} ${activeIdx > i ? 'done' : ''}`}
+              >
+                <div className="res-progress-dot">{i + 1}</div>
+                <span>{labels[i]}</span>
+              </div>
+            ))
+          })()}
         </div>
       )}
 
@@ -261,10 +396,9 @@ export default function Reservations() {
           {step === 'search'    && '🔍 Find a Hotel'}
           {step === 'book'      && '📋 Booking Details'}
           {step === 'payment'   && '💳 Payment'}
-          {step === 'confirmed' && '✅ Booking Confirmed!'}
         </h1>
         <div className="res-header-btns">
-          {step !== 'list' && step !== 'confirmed' && (
+          {step !== 'list' && (
             <button className="res-btn-outline" onClick={() => {
               if (step === 'book') setStep('search')
               else if (step === 'payment') setStep('book')
@@ -296,7 +430,7 @@ export default function Reservations() {
             </div>
             <div className="res-modal-hotel">
               <strong>{budgetHotel.name}</strong>
-              <span>{stars(budgetHotel.stars)} · ${budgetHotel.pricePerNight}/night</span>
+              <span>{stars(budgetHotel.stars)} · {formatEur(hotelNightEur(budgetHotel.pricePerNight))}/night</span>
             </div>
             <form onSubmit={handleBudget} className="res-form">
               <div className="res-form-row">
@@ -305,8 +439,13 @@ export default function Reservations() {
               </div>
               <div className="res-form-row">
                 <label>Persons<input type="number" min="1" value={budgetForm.numberOfPersons} onChange={e => setBudgetForm(f => ({ ...f, numberOfPersons: e.target.value }))} /></label>
-                <label>Coupon<input type="text" placeholder="SKYRES10…" value={budgetForm.couponCode} onChange={e => setBudgetForm(f => ({ ...f, couponCode: e.target.value }))} /></label>
+                <label>Coupon 1<input type="text" placeholder="ILSKYRES1…" value={budgetForm.couponCode} onChange={e => setBudgetForm(f => ({ ...f, couponCode: e.target.value }))} /></label>
               </div>
+              {Number(user?.reservationCount) === 0 && (
+                <div className="res-form-row">
+                  <label>Coupon 2 (1ère réservation)<input type="text" placeholder="2e code distinct" value={budgetForm.secondCouponCode} onChange={e => setBudgetForm(f => ({ ...f, secondCouponCode: e.target.value }))} /></label>
+                </div>
+              )}
               <button type="submit" className="res-btn-primary" disabled={loading}>{loading ? 'Calculating…' : 'Calculate'}</button>
             </form>
             {budget && (
@@ -314,10 +453,17 @@ export default function Reservations() {
                 <div className="budget-rows">
                   <div className="budget-row"><span>Nights</span><span>{budget.numberOfNights}</span></div>
                   <div className="budget-row"><span>Persons</span><span>{budget.numberOfPersons}</span></div>
-                  <div className="budget-row"><span>Price/night</span><span>${budget.pricePerNight?.toFixed(2)}</span></div>
-                  <div className="budget-row"><span>Subtotal</span><span>${budget.subtotal?.toFixed(2)}</span></div>
-                  {budget.discount > 0 && <div className="budget-row discount"><span>Discount ({budget.couponApplied})</span><span>-${budget.discount?.toFixed(2)}</span></div>}
-                  <div className="budget-row total"><span>Total</span><span>${budget.total?.toFixed(2)}</span></div>
+                  <div className="budget-row"><span>Price/night (→ EUR)</span><span>{formatEur(hotelNightEur(budget.pricePerNight))}</span></div>
+                  {(budget.destinationCity || budget.destinationCountry) && (
+                    <div className="budget-row"><span>Destination</span><span>{[budget.destinationCity, budget.destinationCountry].filter(Boolean).join(', ')}</span></div>
+                  )}
+                  <div className="budget-row"><span>Hotel stay (EUR)</span><span>{formatEur(budget.hotelStaySubtotal)}</span></div>
+                  {budget.destinationPackageFee != null && budget.destinationPackageFee > 0 && (
+                    <div className="budget-row"><span>Destination package (EUR)</span><span>{formatEur(budget.destinationPackageFee)}</span></div>
+                  )}
+                  <div className="budget-row"><span>Subtotal (EUR)</span><span>{formatEur(budget.subtotal)}</span></div>
+                  {budget.discount > 0 && <div className="budget-row discount"><span>Discount ({budget.couponApplied})</span><span>-{formatEur(budget.discount)}</span></div>}
+                  <div className="budget-row total"><span>Total (EUR)</span><span>{formatEur(budget.total)}</span></div>
                 </div>
               </div>
             )}
@@ -441,20 +587,90 @@ export default function Reservations() {
           <div className="res-book-hotel">
             <div>
               <h2>{selectedHotel.name}</h2>
-              <p className="res-hint">{stars(selectedHotel.stars)} · ${selectedHotel.pricePerNight}/night{selectedHotel.averageRating ? ` · Rating ${selectedHotel.averageRating.toFixed(1)}` : ''}</p>
+              <p className="res-hint">
+                {stars(selectedHotel.stars)} · {formatEur(hotelNightEur(selectedHotel.pricePerNight))}/night
+                {selectedHotel.averageRating ? ` · Rating ${selectedHotel.averageRating.toFixed(1)}` : ''}
+                {selectedHotel.destination && (
+                  <> · {[selectedHotel.destination.city, selectedHotel.destination.country].filter(Boolean).join(', ')}</>
+                )}
+              </p>
             </div>
             <button className="res-btn-outline" onClick={() => setStep('search')}>← Change hotel</button>
           </div>
+          {bookingEstimateEur && (
+            <div className="res-book-estimate">
+              <strong>Estimation (EUR)</strong>
+              <div className="res-summary-grid">
+                <div className="res-summary-item">
+                  <span>Hôtel ({bookingEstimateEur.nights} nuit{bookingEstimateEur.nights > 1 ? 's' : ''} × {bookingEstimateEur.persons} pers.)</span>
+                  <strong>{formatEur(bookingEstimateEur.hotelPart)}</strong>
+                </div>
+                {bookingEstimateEur.destPart > 0 && (
+                  <div className="res-summary-item">
+                    <span>Forfait destination (1× séjour)</span>
+                    <strong>{formatEur(bookingEstimateEur.destPart)}</strong>
+                  </div>
+                )}
+                <div className="res-summary-item">
+                  <span>Sous-total (avant coupons)</span>
+                  <strong>{formatEur(bookingEstimateEur.subtotal)}</strong>
+                </div>
+                {bookingEstimateEur.discountEur > 0.005 && (
+                  <div className="res-summary-item res-summary-discount">
+                    <span>Réduction coupons</span>
+                    <strong>−{formatEur(bookingEstimateEur.discountEur)}</strong>
+                  </div>
+                )}
+                <div className="res-summary-item total">
+                  <span>Total estimé</span>
+                  <strong>{formatEur(bookingEstimateEur.totalEur)}</strong>
+                </div>
+              </div>
+              <p className="res-book-estimate-note">
+                Même calcul que le panneau « Votre voyage » (dates, personnes, codes). Montants en EUR, alignés avec le serveur au paiement.
+              </p>
+            </div>
+          )}
           <form onSubmit={handleBook} className="res-form">
             <div className="res-form-row">
-              <label>Check-in<input type="date" value={form.checkIn} onChange={e => setForm(f => ({ ...f, checkIn: e.target.value }))} required /></label>
-              <label>Check-out<input type="date" value={form.checkOut} onChange={e => setForm(f => ({ ...f, checkOut: e.target.value }))} required /></label>
+              <label>Check-in<input type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} required /></label>
+              <label>Check-out<input type="date" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} required /></label>
             </div>
             <div className="res-form-row">
-              <label>Number of persons<input type="number" min="1" value={form.numberOfPersons} onChange={e => setForm(f => ({ ...f, numberOfPersons: e.target.value }))} required /></label>
-              <label>Coupon Code <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(optional)</span><input type="text" placeholder="SKYRES10, WELCOME…" value={form.couponCode} onChange={e => setForm(f => ({ ...f, couponCode: e.target.value }))} /></label>
+              <label>Number of persons<input type="number" min={1} max={20} value={persons} onChange={(e) => setPersons(Math.max(1, Number(e.target.value) || 1))} required /></label>
             </div>
-            <div className="res-book-tip">💡 Coupons: <strong>SKYRES10</strong> (10%), <strong>SKYRES20</strong> (20%), <strong>WELCOME</strong> (15%), <strong>SUMMER25</strong> (25%)</div>
+            <div className="res-book-coupon-block">
+              <p className="res-book-coupon-title">Codes promo</p>
+              <p className="res-book-coupon-hint">
+                {maxCouponSlots === 2
+                  ? 'Première réservation : jusqu’à 2 codes distincts — grattez une carte par code (identique au panneau de droite).'
+                  : 'Un seul code par réservation (compte déjà une réservation).'}
+              </p>
+              <CouponScratchCard
+                applyCoupon={applyCoupon}
+                appliedCoupons={appliedCoupons}
+                maxCouponSlots={maxCouponSlots}
+                variant="booking"
+              />
+              {appliedCoupons.length > 0 && (
+                <ul className="res-book-coupon-chips" aria-label="Codes appliqués">
+                  {appliedCoupons.map((code, i) => (
+                    <li key={`${code}-${i}`}>
+                      <span className="res-book-chip">{code}</span>
+                      <button
+                        type="button"
+                        className="res-book-chip-remove"
+                        onClick={() => removeCoupon(i)}
+                        aria-label={`Retirer ${code}`}
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="res-book-tip">💡 Les mêmes codes et dates sont utilisés dans « Votre voyage » à droite.</div>
             <div className="res-form-actions">
               <button type="button" className="res-btn-outline" onClick={() => openBudget(selectedHotel)}>💰 Simulate Budget</button>
               <button type="submit" className="res-btn-primary" disabled={loading}>{loading ? 'Creating…' : 'Continue to Payment →'}</button>
@@ -471,6 +687,9 @@ export default function Reservations() {
             <h2>📋 Reservation Summary</h2>
             <div className="res-summary-grid">
               <div className="res-summary-item"><span>Hotel</span><strong>{createdReservation.hotelName}</strong></div>
+              {(createdReservation.destinationCity || createdReservation.destinationCountry) && (
+                <div className="res-summary-item"><span>Destination</span><strong>{[createdReservation.destinationCity, createdReservation.destinationCountry].filter(Boolean).join(', ')}</strong></div>
+              )}
               <div className="res-summary-item"><span>Check-in</span><strong>{createdReservation.checkIn}</strong></div>
               <div className="res-summary-item"><span>Check-out</span><strong>{createdReservation.checkOut}</strong></div>
               <div className="res-summary-item"><span>Persons</span><strong>{createdReservation.numberOfPersons}</strong></div>
@@ -479,162 +698,39 @@ export default function Reservations() {
                   {createdReservation.status}
                 </span>
               </div>
-              <div className="res-summary-item total"><span>Total Amount</span><strong className="res-total-amount">${createdReservation.totalPrice?.toFixed(2)}</strong></div>
+              {createdReservation.hotelStaySubtotal != null && (
+                <div className="res-summary-item"><span>Hôtel (hébergement, EUR)</span><strong>{formatEur(createdReservation.hotelStaySubtotal)}</strong></div>
+              )}
+              {createdReservation.destinationPackageFee != null && createdReservation.destinationPackageFee > 0 && (
+                <div className="res-summary-item"><span>Forfait destination (EUR)</span><strong>{formatEur(createdReservation.destinationPackageFee)}</strong></div>
+              )}
+              <div className="res-summary-item total"><span>Total (EUR)</span><strong className="res-total-amount">{formatEur(createdReservation.totalPrice)}</strong></div>
             </div>
           </div>
 
-          {/* Payment method selection */}
-          <div className="res-card">
-            <h2>💳 Choose Payment Method</h2>
-            <p className="res-hint">Select your preferred payment method to confirm the booking</p>
-
-            <div className="res-payment-methods">
-              {PAYMENT_METHODS.map(m => (
-                <div
-                  key={m.key}
-                  className={`res-payment-option ${paymentMethod === m.key ? 'selected' : ''}`}
-                  onClick={() => setPaymentMethod(m.key)}
+          <div className="res-card res-stripe-only">
+            <h2>💳 Paiement Stripe</h2>
+            <p className="res-hint">
+              Le règlement se fait uniquement via Stripe (carte, test ou production selon la config du serveur).
+            </p>
+            {createdReservation.totalPrice != null && Number(createdReservation.totalPrice) >= 0.5 ? (
+              <>
+                <Link
+                  className="res-btn-primary res-stripe-cta"
+                  to={`/payment?type=reservation&refId=${createdReservation.id}&name=${encodeURIComponent(`${createdReservation.hotelName} — #${createdReservation.id}`)}&price=${encodeURIComponent(String(createdReservation.totalPrice))}`}
                 >
-                  <div className="res-payment-radio">
-                    <div className={`res-radio-dot ${paymentMethod === m.key ? 'active' : ''}`} />
-                  </div>
-                  <div className="res-payment-icon">{m.icon}</div>
-                  <div className="res-payment-info">
-                    <strong>{m.label}</strong>
-                    <span>{m.desc}</span>
-                  </div>
-                  {paymentMethod === m.key && <div className="res-payment-check">✓</div>}
-                </div>
-              ))}
-            </div>
-
-            {/* Card form simulation */}
-            {paymentMethod === 'CARD' && (
-              <div className="res-card-form">
-                <h3>Card Details</h3>
-                <div className="res-form">
-                  <label>Card Number<input type="text" placeholder="1234 5678 9012 3456" maxLength="19" /></label>
-                  <div className="res-form-row">
-                    <label>Expiry Date<input type="text" placeholder="MM/YY" maxLength="5" /></label>
-                    <label>CVV<input type="text" placeholder="123" maxLength="3" /></label>
-                  </div>
-                  <label>Cardholder Name<input type="text" placeholder="John Doe" /></label>
-                </div>
-              </div>
+                  Payer avec Stripe — {formatEur(createdReservation.totalPrice)}
+                </Link>
+                <p className="res-stripe-note">
+                  Après le paiement, revenez à <strong>Mes réservations</strong> pour voir le statut mis à jour (webhook Stripe recommandé côté serveur).
+                </p>
+              </>
+            ) : (
+              <p className="res-hint">Montant trop faible ou indisponible pour le checkout Stripe.</p>
             )}
-
-            {paymentMethod === 'PAYPAL' && (
-              <div className="res-paypal-info">
-                <p>🔗 You will be redirected to PayPal to complete your payment securely.</p>
-              </div>
-            )}
-
-            {paymentMethod === 'CASH' && (
-              <div className="res-cash-info">
-                <p>💵 You will pay <strong>${createdReservation.totalPrice?.toFixed(2)}</strong> in cash upon arrival at the hotel.</p>
-                <p>Your reservation will be held for 24 hours.</p>
-              </div>
-            )}
-
-            <div className="res-payment-footer">
-              <div className="res-payment-total">
-                <span>Total to pay</span>
-                <strong>${createdReservation.totalPrice?.toFixed(2)}</strong>
-              </div>
-              <button
-                className="res-btn-pay"
-                onClick={handlePay}
-                disabled={paymentLoading}
-              >
-                {paymentLoading ? (
-                  <span>Processing… ⏳</span>
-                ) : (
-                  <span>{methodIcon(paymentMethod)} Pay ${createdReservation.totalPrice?.toFixed(2)}</span>
-                )}
-              </button>
-            </div>
           </div>
         </div>
       )}
-
-      {/* ── STEP: CONFIRMED ── */}
-{step === 'confirmed' && createdReservation && paymentDone && (
-  <div>
-    {/* Success banner */}
-    <div className="res-confirmed-banner">
-      <div className="res-confirmed-checkmark">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="20 6 9 17 4 12"/>
-        </svg>
-      </div>
-      <div>
-        <h2>Booking Confirmed</h2>
-        <p>Your reservation at <strong>{createdReservation.hotelName}</strong> has been confirmed successfully.</p>
-      </div>
-    </div>
-
-    {/* Booking details */}
-    <div className="res-card">
-      <h2>Booking Details</h2>
-      <div className="res-summary-grid">
-        <div className="res-summary-item"><span>Reservation ID</span><strong>#{createdReservation.id}</strong></div>
-        <div className="res-summary-item"><span>Hotel</span><strong>{createdReservation.hotelName}</strong></div>
-        <div className="res-summary-item"><span>Check-in</span><strong>{createdReservation.checkIn}</strong></div>
-        <div className="res-summary-item"><span>Check-out</span><strong>{createdReservation.checkOut}</strong></div>
-        <div className="res-summary-item"><span>Guests</span><strong>{createdReservation.numberOfPersons} person(s)</strong></div>
-        <div className="res-summary-item"><span>Payment Method</span><strong>{paymentDone.method}</strong></div>
-        <div className="res-summary-item"><span>Payment Status</span>
-          <span className="res-status-pill" style={{ background: '#059669' }}>PAID</span>
-        </div>
-        <div className="res-summary-item"><span>Booking Status</span>
-          <span className="res-status-pill" style={{ background: '#059669' }}>CONFIRMED</span>
-        </div>
-        <div className="res-summary-item total"><span>Amount Paid</span><strong className="res-total-amount">${paymentDone.amount?.toFixed(2)}</strong></div>
-      </div>
-    </div>
-
-    {/* Documents */}
-    <div className="res-card">
-      <h2>Your Documents</h2>
-      <p className="res-hint">Download your invoice or present the QR code at hotel check-in</p>
-      <div className="res-confirmed-actions">
-        <button className="res-doc-btn pdf" onClick={() => handlePdf(createdReservation.id)}>
-          <div className="res-doc-icon pdf-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="16" y1="13" x2="8" y2="13"/>
-              <line x1="16" y1="17" x2="8" y2="17"/>
-            </svg>
-          </div>
-          <div>
-            <strong>Download Invoice</strong>
-            <span>PDF receipt for your records</span>
-          </div>
-        </button>
-        <button className="res-doc-btn qr" onClick={() => handleQr(createdReservation.id)}>
-          <div className="res-doc-icon qr-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-              <rect x="3" y="14" width="7" height="7"/>
-              <rect x="14" y="14" width="3" height="3"/>
-            </svg>
-          </div>
-          <div>
-            <strong>View QR Code</strong>
-            <span>Present at hotel check-in</span>
-          </div>
-        </button>
-      </div>
-    </div>
-
-    <div className="res-confirmed-footer">
-      <button className="res-btn-primary" onClick={goHome}>
-        Back to My Reservations
-      </button>
-    </div>
-  </div>
-)}
 
       {/* ── STEP: LIST ── */}
       {step === 'list' && (
@@ -645,7 +741,9 @@ export default function Reservations() {
           </div>
         ) : (
           <div className="res-list">
-            {reservations.map(r => (
+            {reservations.map(r => {
+              const bookedAt = formatReservationBookedAt(r.createdAt)
+              return (
               <div key={r.id} className="res-item">
                 <div className="res-item-header">
                   <div>
@@ -655,19 +753,28 @@ export default function Reservations() {
                   <span className="res-status" style={{ background: statusColor(r.status) }}>{r.status}</span>
                 </div>
                 <div className="res-item-details">
+                  {bookedAt && (
+                    <div><span>📋</span> Booked {bookedAt}</div>
+                  )}
                   <div><span>📅</span> {r.checkIn} → {r.checkOut}</div>
                   <div><span>👥</span> {r.numberOfPersons} person(s)</div>
-                  <div><span>💵</span> Total: <strong>${r.totalPrice?.toFixed(2)}</strong></div>
+                  <div><span>💵</span> Total: <strong>{formatEur(r.totalPrice)}</strong></div>
                 </div>
                 <div className="res-item-actions">
                   <button className="res-action-btn pdf" onClick={() => handlePdf(r.id)}>📄 Invoice PDF</button>
                   <button className="res-action-btn qr" onClick={() => handleQr(r.id)}>⬛ QR Code</button>
-                  {r.status !== 'CANCELLED' && r.status !== 'COMPLETED' && (
+                  {String(r.status || '').toUpperCase() === 'PENDING' && (
                     <button className="res-action-btn cancel" onClick={() => handleCancel(r.id)}>✕ Cancel</button>
+                  )}
+                  {String(r.status || '').toUpperCase() === 'CANCELLED' && (
+                    <button type="button" className="res-action-btn delete" onClick={() => handleDeleteCancelled(r.id)}>
+                      🗑 Remove
+                    </button>
                   )}
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         )
       )}

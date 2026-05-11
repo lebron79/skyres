@@ -9,6 +9,10 @@ public interface ReservationService {
     ReservationResponse getById(Long id);
     List<ReservationResponse> getByUserId(Long userId);
     ReservationResponse cancel(Long id);
+
+    /** Removes a cancelled reservation permanently; only the owning user may call this. */
+    void deleteCancelledIfOwned(Long reservationId, String ownerEmail);
+
     byte[] generatePdf(Long id);
     byte[] generateQrCode(Long id);
 }

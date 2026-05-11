@@ -1,0 +1,295 @@
+/* Coupon scratch card — SkyRes promo */
+
+.csc {
+  margin-top: 0.25rem;
+}
+
+.csc-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.csc-head-icon {
+  font-size: 1.75rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.08));
+}
+
+.csc-title {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.csc-sub {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+
+.csc-sub strong {
+  color: var(--teal);
+  font-weight: 700;
+}
+
+.csc-note {
+  margin: 0;
+  font-size: 0.84rem;
+}
+
+.csc-note--muted {
+  color: var(--text-3);
+  font-style: italic;
+}
+
+.csc-card {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(10, 114, 101, 0.22);
+  box-shadow: 0 8px 28px rgba(10, 114, 101, 0.12);
+  background: linear-gradient(165deg, rgba(13, 148, 136, 0.06) 0%, rgba(249, 248, 245, 0.95) 100%);
+}
+
+.csc-prize {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 152px;
+  padding: 18px 16px;
+  text-align: center;
+  background: radial-gradient(ellipse 120% 80% at 50% 100%, rgba(10, 114, 101, 0.09), transparent 55%);
+}
+
+.csc-prize-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.csc-prize-code {
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  color: var(--teal);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.csc-prize-pct {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-2);
+}
+
+.csc-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+  border-radius: 14px;
+}
+
+.csc-canvas:active {
+  cursor: grabbing;
+}
+
+.csc-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.csc-progress {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-3);
+  min-height: 1.2em;
+}
+
+.csc-skip {
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--teal);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.csc-skip:hover {
+  color: var(--text);
+}
+
+.csc-feedback {
+  margin: 12px 0 0;
+  font-size: 0.84rem;
+  font-weight: 600;
+  padding: 10px 12px;
+  border-radius: 10px;
+  line-height: 1.4;
+}
+
+.csc-feedback--ok {
+  background: rgba(5, 150, 105, 0.1);
+  color: #065f46;
+  border: 1px solid rgba(5, 150, 105, 0.25);
+}
+
+.csc-feedback--warn {
+  background: rgba(245, 158, 11, 0.12);
+  color: #92400e;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.csc--booking .csc-card {
+  max-width: 100%;
+}
+
+.csc--sidebar .csc-head {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.csc--sidebar .csc-title {
+  font-size: 0.88rem;
+}
+
+.csc--sidebar .csc-sub {
+  font-size: 0.74rem;
+}
+
+/* Marketing strip above the scratch card */
+.csc-marketing {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(13, 148, 136, 0.14) 0%, rgba(251, 191, 36, 0.12) 100%);
+  border: 1px solid rgba(10, 114, 101, 0.25);
+  box-shadow: 0 4px 16px rgba(10, 114, 101, 0.08);
+}
+
+.csc-marketing-kicker {
+  margin: 0 0 4px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--teal, #0d9488);
+}
+
+.csc-marketing-headline {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.35;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.csc-marketing-headline strong {
+  color: var(--teal, #0d9488);
+}
+
+.csc-marketing-sub {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-2);
+}
+
+.csc-prize-mystery {
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: 0.35em;
+  color: rgba(10, 114, 101, 0.35);
+  user-select: none;
+}
+
+.csc-prize-hint-mystery {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.csc-canvas--disabled {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.csc-apply {
+  margin-top: 14px;
+}
+
+.csc-apply-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-2);
+}
+
+.csc-apply-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+.csc-apply-input {
+  flex: 1;
+  min-width: 140px;
+  padding: 10px 12px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border: 1px solid rgba(10, 114, 101, 0.28);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--text);
+}
+
+.csc-apply-input:focus {
+  outline: none;
+  border-color: var(--teal, #0d9488);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.2);
+}
+
+.csc-apply-btn {
+  padding: 10px 18px;
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(165deg, #0f766e 0%, #0d9488 100%);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.csc-apply-btn:hover {
+  filter: brightness(1.05);
+}
+
+.csc-feedback--info {
+  background: rgba(59, 130, 246, 0.1);
+  color: #1e40af;
+  border: 1px solid rgba(59, 130, 246, 0.28);
+}

@@ -15,6 +15,8 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Component
 @RequiredArgsConstructor
 public class CatalogSeed implements ApplicationRunner {
@@ -189,9 +191,14 @@ public class CatalogSeed implements ApplicationRunner {
             String imageUrl,
             Destination destination
     ) {
-        Activity activity = activityRepository
-                .findByNameIgnoreCaseAndDestinationId(name, destination.getId())
-                .orElseGet(Activity::new);
+        List<Activity> matches =
+                activityRepository.findAllByNameIgnoreCaseAndDestinationIdOrderByIdAsc(name, destination.getId());
+        Activity activity = matches.isEmpty() ? new Activity() : matches.get(0);
+        if (matches.size() > 1) {
+            for (int i = 1; i < matches.size(); i++) {
+                activityRepository.deleteById(matches.get(i).getId());
+            }
+        }
         activity.setName(name);
         activity.setType(type);
         activity.setDescription(description);
