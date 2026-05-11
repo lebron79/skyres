@@ -43,7 +43,7 @@ public class SecurityConfig {
         "/api-docs/**",
         "/v3/api-docs/**",
         "/swagger-ui.html"
-    };
+};
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {

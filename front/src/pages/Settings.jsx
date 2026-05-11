@@ -56,7 +56,7 @@ export default function Settings({ onClose }) {
       const formData = new FormData()
       formData.append('file', file)
 
-      const response = await fetch('http://localhost:8080/api/upload/profile-image', {
+      const response = await fetch('http://localhost:9000/api/upload/profile-image', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -215,7 +215,7 @@ export default function Settings({ onClose }) {
                 <div className="photo-upload-container">
                   {profileForm.photoUrl && (
                     <div className="photo-preview">
-                      <img src={`http://localhost:8080${profileForm.photoUrl}`} alt="Profile" />
+                      <img src={`http://localhost:9000${profileForm.photoUrl}`} alt="Profile" />
                       <button
                         type="button"
                         className="photo-remove"

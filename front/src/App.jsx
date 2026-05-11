@@ -10,6 +10,7 @@ import PaymentPage from './PaymentPage.jsx'
 import PaymentSuccess from './PaymentSuccess.jsx'
 import PaymentCancel from './PaymentCancel.jsx'
 import RequireAuth from './RequireAuth.jsx'
+import Reservations from './pages/Reservations.jsx'
 import './App.css'
 
 export default function App() {
@@ -62,6 +63,14 @@ export default function App() {
             element={
               <RequireAuth>
                 <AdminPanel />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/reservations"
+            element={
+              <RequireAuth>
+                <Reservations />
               </RequireAuth>
             }
           />

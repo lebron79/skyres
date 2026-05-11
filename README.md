@@ -1,13 +1,13 @@
 # Skyres - Smart Tourism Platform
 
 Project stack:
-- Backend: Spring Boot (Java 17, Maven)
+- Backend: Spring Boot (Java 21, Maven)
 - Frontend: React + Vite
 - Database: MySQL
 
 ## 1) Prerequisites
 
-- Java 17
+- Java 21
 - Maven 3.9+
 - Node.js 18+ and npm
 - MySQL 8+
@@ -50,10 +50,10 @@ mvn spring-boot:run
 ```
 
 Backend default URL:
-- `http://localhost:8080`
+- `http://localhost:9000`
 
 Swagger:
-- `http://localhost:8080/swagger-ui.html`
+- `http://localhost:9000/swagger-ui/index.html`
 
 ## 5) Run Frontend
 
@@ -71,13 +71,13 @@ Frontend URL (usually):
 ## 6) Quick Health Checks
 
 - Frontend: open the Vite URL in browser
-- Backend API docs: `http://localhost:8080/api-docs`
-- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- Backend API docs: `http://localhost:9000/api-docs`
+- Swagger UI: `http://localhost:9000/swagger-ui/index.htmll`
 
 ## 7) Person 4 APIs (Guides / Activities / Intelligence)
 
 Base URL:
-- `http://localhost:8080/api`
+- `http://localhost:9000/api`
 
 Main endpoints:
 - `GET/POST/PUT/DELETE /guides`

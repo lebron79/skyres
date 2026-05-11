@@ -239,9 +239,9 @@ export function HomePage() {
 
 
   useEffect(() => {
-    if (!isAuthenticated || !token || user?.role !== 'TOURIST') return
+    if (!isAuthenticated || !token || user?.role !== 'TOURIST' || user?.id == null) return
     setBookingsLoading(true)
-    apiFetch('/api/reservations', { method: 'GET' }, token)
+    apiFetch(`/api/reservations/user/${user.id}`, { method: 'GET' }, token)
       .then(data => setMyBookings(Array.isArray(data) ? data : []))
       .catch(() => setMyBookings([]))
       .finally(() => setBookingsLoading(false))
@@ -516,8 +516,15 @@ export function HomePage() {
                     <div key={b.id} className="booking-card">
                       <div className="booking-header">
                         <div>
-                          <div className="booking-hotel">{b.hotel?.name ?? 'Hotel'}</div>
-                          <div className="booking-dest">{b.hotel?.destination?.city ?? ''}{b.hotel?.destination?.city && b.hotel?.destination?.country ? ', ' : ''}{b.hotel?.destination?.country ?? ''}</div>
+                          <div className="booking-hotel">{b.hotelName ?? b.hotel?.name ?? 'Hotel'}</div>
+                          <div className="booking-dest">
+                            {b.destinationCity ?? b.hotel?.destination?.city ?? ''}
+                            {(b.destinationCity ?? b.hotel?.destination?.city) &&
+                            (b.destinationCountry ?? b.hotel?.destination?.country)
+                              ? ', '
+                              : ''}
+                            {b.destinationCountry ?? b.hotel?.destination?.country ?? ''}
+                          </div>
                         </div>
                         <span className="booking-status" style={{ background: statusColor }}>{b.status}</span>
                       </div>

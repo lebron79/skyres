@@ -41,6 +41,7 @@ export default function Layout() {
         <ul className="nav-links">
           <li><Link to="/hotels">Hôtels</Link></li>
           <li><Link to="/destinations">Destinations</Link></li>
+          {user && <li><Link to="/reservations">Reservations</Link></li>}
           <li><Link to="/#guides">Guides</Link></li>
           <li><Link to="/#activities">Activities</Link></li>
           <li><Link to="/#how">How it works</Link></li>
